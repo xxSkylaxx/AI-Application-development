@@ -1,483 +1,890 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
-<head>
+<html lang="zh-TW"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>極簡待辦事項 TaskMaster</title>
+    <title>便利貼看板 Sticky Notes Board</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icon CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <!-- 載入源柔黑體 (Gen Jyuu Gothic) CDN 以及 fallback 圓體 (Zen Maru Gothic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Noto Sans TC', 'sans-serif'],
+                        sans: ['"Gen Jyuu Gothic"', '"源柔黑體"', '"Zen Maru Gothic"', 'sans-serif'],
+                        genjyuu: ['"Gen Jyuu Gothic"', '"源柔黑體"', '"Zen Maru Gothic"', 'sans-serif'],
                     },
+                    colors: {
+                        noteYellow: '#fef08a',
+                        notePink: '#fbcfe8',
+                        noteGreen: '#bbf7d0',
+                        noteBlue: '#bfdbfe',
+                        notePurple: '#e9d5ff',
+                        noteOrange: '#fed7aa',
+                        noteGray: '#e2e8f0',
+                    }
                 }
             }
         }
     </script>
+
     <style>
-        .custom-scrollbar::-webkit-scrollbar {
+        /* 引入源柔黑體字型聲明（Gen Jyuu Gothic Web Font CDN） */
+        @font-face {
+            font-family: 'Gen Jyuu Gothic';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('https://cdn.jsdelivr.net/gh/satyr/gen-jyuu-gothic@v1.0/GenJyuuGothic-Normal.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Gen Jyuu Gothic';
+            font-style: normal;
+            font-weight: 700;
+            font-display: swap;
+            src: url('https://cdn.jsdelivr.net/gh/satyr/gen-jyuu-gothic@v1.0/GenJyuuGothic-Bold.woff2') format('woff2');
+        }
+
+        /* 預設全域字型設定，排除 FontAwesome 圖示 */
+        body, input, button, textarea, select, div, h1, h2, h3, h4, p, span {
+            font-family: 'Gen Jyuu Gothic', '源柔黑體', 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* 確保 FontAwesome 圖示字型不會被萬用字元覆蓋 */
+        i, .fa, .fas, .far, .fab, .fa-solid, .fa-regular, .fa-brands {
+            font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important;
+        }
+
+        body {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* 便利貼特殊陰影與質感 */
+        .sticky-note {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+            box-shadow: 4px 6px 15px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        .sticky-note:hover {
+            box-shadow: 10px 16px 25px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+            z-index: 40 !important;
+        }
+
+        /* 釘住狀態特效 */
+        .pinned-badge {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+        }
+
+        /* 客製化滾動條 */
+        ::-webkit-scrollbar {
             width: 6px;
+            height: 6px;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 8px;
+        ::-webkit-scrollbar-track {
+            background: transparent;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
+        ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 8px;
+            border-radius: 9999px;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
-        .completed-item {
-            text-decoration: line-through;
-            opacity: 0.6;
+
+        /* 可編輯區域 focus 樣式 */
+        .note-content:focus {
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.25);
+            border-radius: 6px;
+        }
+
+        /* 畫布容器 */
+        #board-canvas {
+            min-height: calc(100vh - 100px);
+            position: relative;
+        }
+
+        /* 網格模式樣式 */
+        .grid-view-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        /* 標籤 Tag 樣式 */
+        .tag-pill {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            font-weight: 500;
         }
     </style>
-</head>
-<body class="bg-emerald-50/60 text-slate-800 font-sans min-h-screen py-6 px-4 sm:px-6 lg:px-8">
-    
-    <div class="max-w-3xl mx-auto">
-        <!-- Header & App Title -->
-        <header class="mb-6 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div>
-                <h1 class="text-3xl font-extrabold text-emerald-950 tracking-tight flex items-center gap-3">
-                    <i class="fa-solid fa-leaf text-emerald-600"></i> TaskMaster
-                </h1>
-                <p class="text-sm text-emerald-700/70 mt-1">有效規劃每一天，輕鬆達成新目標</p>
-            </div>
-            <!-- Statistics Card -->
-            <div class="bg-white p-3 px-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4 min-w-[200px]">
-                <div class="relative w-12 h-12 flex items-center justify-center">
-                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path class="text-emerald-100/60" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                        <path id="progressCircle" class="text-emerald-600 transition-all duration-500 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    </svg>
-                    <span id="progressPercent" class="absolute text-xs font-bold text-emerald-900">0%</span>
-                </div>
-                <div>
-                    <div class="text-xs font-medium text-slate-400">完成進度</div>
-                    <div class="text-sm font-bold text-slate-700"><span id="completedCount">0</span> / <span id="totalCount">0</span> 已完成</div>
-                </div>
-            </div>
-        </header>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:"Gen Jyuu Gothic", "源柔黑體", "Zen Maru Gothic", sans-serif;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.pointer-events-auto{pointer-events:auto}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.sticky{position:sticky}.inset-0{inset:0px}.left-3{left:0.75rem}.right-2\.5{right:0.625rem}.top-0{top:0px}.top-1\/2{top:50%}.right-0{right:0px}.top-6{top:1.5rem}.z-0{z-index:0}.z-50{z-index:50}.mx-1{margin-left:0.25rem;margin-right:0.25rem}.mx-4{margin-left:1rem;margin-right:1rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:0.25rem}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mt-3{margin-top:0.75rem}.flex{display:flex}.hidden{display:none}.h-10{height:2.5rem}.h-12{height:3rem}.h-20{height:5rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-full{height:100%}.max-h-\[280px\]{max-height:280px}.min-h-screen{min-height:100vh}.min-h-\[110px\]{min-height:110px}.w-10{width:2.5rem}.w-12{width:3rem}.w-20{width:5rem}.w-6{width:1.5rem}.w-full{width:100%}.w-px{width:1px}.w-24{width:6rem}.w-5{width:1.25rem}.max-w-7xl{max-width:80rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.-translate-y-1\/2{--tw-translate-y:-50%;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.-rotate-6{--tw-rotate:-6deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.-rotate-45{--tw-rotate:-45deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.scale-95{--tw-scale-x:.95;--tw-scale-y:.95;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transform{transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.cursor-pointer{cursor:pointer}.cursor-move{cursor:move}.select-none{-webkit-user-select:none;user-select:none}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-1\.5{gap:0.375rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.overflow-auto{overflow:auto}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}.whitespace-pre-wrap{white-space:pre-wrap}.break-words{overflow-wrap:break-word}.rounded-2xl{border-radius:1rem}.rounded-3xl{border-radius:1.5rem}.rounded-lg{border-radius:0.5rem}.rounded-xl{border-radius:0.75rem}.rounded-full{border-radius:9999px}.rounded-md{border-radius:0.375rem}.border{border-width:1px}.border-0{border-width:0px}.border-b{border-bottom-width:1px}.border-t{border-top-width:1px}.border-slate-200\/60{border-color:rgb(226 232 240 / 0.6)}.border-slate-200\/80{border-color:rgb(226 232 240 / 0.8)}.border-transparent{border-color:transparent}.border-black\/10{border-color:rgb(0 0 0 / 0.1)}.border-black\/5{border-color:rgb(0 0 0 / 0.05)}.bg-amber-100\/90{background-color:rgb(254 243 199 / 0.9)}.bg-amber-500{--tw-bg-opacity:1;background-color:rgb(245 158 11 / var(--tw-bg-opacity, 1))}.bg-blue-200{--tw-bg-opacity:1;background-color:rgb(191 219 254 / var(--tw-bg-opacity, 1))}.bg-green-200{--tw-bg-opacity:1;background-color:rgb(187 247 208 / var(--tw-bg-opacity, 1))}.bg-orange-200{--tw-bg-opacity:1;background-color:rgb(254 215 170 / var(--tw-bg-opacity, 1))}.bg-pink-200{--tw-bg-opacity:1;background-color:rgb(251 207 232 / var(--tw-bg-opacity, 1))}.bg-purple-200{--tw-bg-opacity:1;background-color:rgb(233 213 255 / var(--tw-bg-opacity, 1))}.bg-red-100{--tw-bg-opacity:1;background-color:rgb(254 226 226 / var(--tw-bg-opacity, 1))}.bg-red-500{--tw-bg-opacity:1;background-color:rgb(239 68 68 / var(--tw-bg-opacity, 1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.bg-slate-200{--tw-bg-opacity:1;background-color:rgb(226 232 240 / var(--tw-bg-opacity, 1))}.bg-slate-900\/40{background-color:rgb(15 23 42 / 0.4)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-white\/90{background-color:rgb(255 255 255 / 0.9)}.bg-yellow-200{--tw-bg-opacity:1;background-color:rgb(254 240 138 / var(--tw-bg-opacity, 1))}.bg-white\/40{background-color:rgb(255 255 255 / 0.4)}.bg-white\/60{background-color:rgb(255 255 255 / 0.6)}.bg-white\/95{background-color:rgb(255 255 255 / 0.95)}.bg-gradient-to-r{background-image:linear-gradient(to right, var(--tw-gradient-stops))}.bg-gradient-to-tr{background-image:linear-gradient(to top right, var(--tw-gradient-stops))}.from-amber-400{--tw-gradient-from:#fbbf24 var(--tw-gradient-from-position);--tw-gradient-to:rgb(251 191 36 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-amber-600{--tw-gradient-from:#d97706 var(--tw-gradient-from-position);--tw-gradient-to:rgb(217 119 6 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.to-orange-600{--tw-gradient-to:#ea580c var(--tw-gradient-to-position)}.to-yellow-300{--tw-gradient-to:#fde047 var(--tw-gradient-to-position)}.bg-clip-text{-webkit-background-clip:text;background-clip:text}.p-1{padding:0.25rem}.p-1\.5{padding:0.375rem}.p-2{padding:0.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.px-3\.5{padding-left:0.875rem;padding-right:0.875rem}.px-4{padding-left:1rem;padding-right:1rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2\.5{padding-top:0.625rem;padding-bottom:0.625rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.pb-1{padding-bottom:0.25rem}.pl-9{padding-left:2.25rem}.pr-8{padding-right:2rem}.pb-1\.5{padding-bottom:0.375rem}.pt-2{padding-top:0.5rem}.text-center{text-align:center}.font-sans{font-family:"Gen Jyuu Gothic", "源柔黑體", "Zen Maru Gothic", sans-serif}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-\[11px\]{font-size:11px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-\[10px\]{font-size:10px}.text-base{font-size:1rem;line-height:1.5rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.leading-relaxed{line-height:1.625}.tracking-tight{letter-spacing:-0.025em}.tracking-wide{letter-spacing:0.025em}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59 / var(--tw-text-opacity, 1))}.text-amber-500{--tw-text-opacity:1;color:rgb(245 158 11 / var(--tw-text-opacity, 1))}.text-amber-600{--tw-text-opacity:1;color:rgb(217 119 6 / var(--tw-text-opacity, 1))}.text-amber-900{--tw-text-opacity:1;color:rgb(120 53 15 / var(--tw-text-opacity, 1))}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216 / var(--tw-text-opacity, 1))}.text-green-700{--tw-text-opacity:1;color:rgb(21 128 61 / var(--tw-text-opacity, 1))}.text-orange-700{--tw-text-opacity:1;color:rgb(194 65 12 / var(--tw-text-opacity, 1))}.text-pink-700{--tw-text-opacity:1;color:rgb(190 24 93 / var(--tw-text-opacity, 1))}.text-purple-700{--tw-text-opacity:1;color:rgb(126 34 206 / var(--tw-text-opacity, 1))}.text-red-500{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139 / var(--tw-text-opacity, 1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85 / var(--tw-text-opacity, 1))}.text-transparent{color:transparent}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-yellow-700{--tw-text-opacity:1;color:rgb(161 98 7 / var(--tw-text-opacity, 1))}.text-slate-700\/60{color:rgb(51 65 85 / 0.6)}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.placeholder-slate-400::placeholder{--tw-placeholder-opacity:1;color:rgb(148 163 184 / var(--tw-placeholder-opacity, 1))}.opacity-0{opacity:0}.opacity-60{opacity:0.6}.opacity-40{opacity:0.4}.opacity-75{opacity:0.75}.opacity-80{opacity:0.8}.shadow-2xl{--tw-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-inner{--tw-shadow:inset 0 2px 4px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:inset 0 2px 4px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-md{--tw-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.backdrop-blur-md{--tw-backdrop-blur:blur(12px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-opacity{transition-property:opacity;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.duration-200{transition-duration:200ms}.selection\:bg-amber-200 *::selection{--tw-bg-opacity:1;background-color:rgb(253 230 138 / var(--tw-bg-opacity, 1))}.selection\:bg-amber-200::selection{--tw-bg-opacity:1;background-color:rgb(253 230 138 / var(--tw-bg-opacity, 1))}.hover\:rotate-0:hover{--tw-rotate:0deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:scale-110:hover{--tw-scale-x:1.1;--tw-scale-y:1.1;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:bg-amber-600:hover{--tw-bg-opacity:1;background-color:rgb(217 119 6 / var(--tw-bg-opacity, 1))}.hover\:bg-red-50:hover{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.hover\:bg-red-600:hover{--tw-bg-opacity:1;background-color:rgb(220 38 38 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.hover\:bg-black\/5:hover{background-color:rgb(0 0 0 / 0.05)}.hover\:text-amber-600:hover{--tw-text-opacity:1;color:rgb(217 119 6 / var(--tw-text-opacity, 1))}.hover\:text-red-600:hover{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.hover\:text-slate-600:hover{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.hover\:text-slate-800:hover{--tw-text-opacity:1;color:rgb(30 41 59 / var(--tw-text-opacity, 1))}.hover\:text-red-500:hover{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.hover\:shadow-lg:hover{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.focus\:border-amber-400:focus{--tw-border-opacity:1;border-color:rgb(251 191 36 / var(--tw-border-opacity, 1))}.focus\:bg-white:focus{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)}.focus\:ring-amber-100:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(254 243 199 / var(--tw-ring-opacity, 1))}.group\/color:hover .group-hover\/color\:flex{display:flex}.group:hover .group-hover\:opacity-100{opacity:1}@media (min-width: 640px){.sm\:inline{display:inline}}@media (min-width: 768px){.md\:block{display:block}.md\:hidden{display:none}.md\:w-96{width:24rem}.md\:w-auto{width:auto}.md\:flex-row{flex-direction:row}.md\:pb-0{padding-bottom:0px}}</style></head>
+<body class="flex flex-col min-h-screen text-slate-800 antialiased selection:bg-amber-200">
 
-        <!-- Add Task Input Form Card -->
-        <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 p-4 sm:p-5 mb-6">
-            <form id="todoForm" class="space-y-4">
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <div class="relative flex-1">
-                        <i class="fa-solid fa-pen-nib absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input type="text" id="todoInput" placeholder="想要完成什麼任務？..." class="w-full pl-11 pr-4 py-3 bg-emerald-50/30 border border-emerald-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all placeholder:text-slate-400" required>
+    <!-- 頂部功能導覽列 -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm px-4 py-3 transition-all">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+            
+            <!-- 標題與可愛鉛筆 LOGO -->
+            <div class="flex items-center justify-between w-full md:w-auto">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 flex items-center justify-center text-amber-900 font-bold shadow-sm transform -rotate-6 hover:rotate-0 transition-transform">
+                        <i class="fa-solid fa-pencil text-lg"></i>
                     </div>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors duration-200 shadow-sm shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]">
-                        <i class="fa-solid fa-plus"></i> 新增事項
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">便利貼看板</h1>
+                        <p class="text-[11px] text-slate-500 font-medium tracking-wide">所有零散想法都有其意義，寫下來吧!</p>
+                    </div>
+                </div>
+
+                <!-- 手機版新增按鈕 -->
+                <button onclick="createNewNote('#fef08a')" class="md:hidden flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 rounded-xl font-medium text-sm transition-all shadow-sm">
+                    <i class="fa-solid fa-plus text-xs"></i> 新增
+                </button>
+            </div>
+
+            <!-- 搜尋與類別篩選器 -->
+            <div class="flex items-center gap-2 w-full md:w-96">
+                <!-- 搜尋輸入框 -->
+                <div class="relative w-full">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" oninput="renderNotes()" placeholder="搜尋便利貼內容或標籤..." class="w-full pl-9 pr-8 py-1.5 bg-slate-100 hover:bg-slate-50 focus:bg-white text-sm rounded-xl border border-transparent focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 transition-all">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs" style="display: none;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 工具列 (新增顏色選單、佈局模式、備份與清空) -->
+            <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+                
+                <!-- 新增不同顏色的便利貼按鈕區 -->
+                <div class="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner">
+                    <span class="text-xs font-bold text-slate-400 px-1"><i class="fa-solid fa-palette text-slate-400"></i></span>
+                    <button onclick="createNewNote('#fef08a')" class="w-6 h-6 rounded-lg bg-yellow-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增黃色便利貼"><i class="fa-solid fa-plus text-yellow-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#fbcfe8')" class="w-6 h-6 rounded-lg bg-pink-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增粉紅便利貼"><i class="fa-solid fa-plus text-pink-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#bbf7d0')" class="w-6 h-6 rounded-lg bg-green-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增粉綠便利貼"><i class="fa-solid fa-plus text-green-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#bfdbfe')" class="w-6 h-6 rounded-lg bg-blue-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增粉藍便利貼"><i class="fa-solid fa-plus text-blue-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#e9d5ff')" class="w-6 h-6 rounded-lg bg-purple-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增粉紫便利貼"><i class="fa-solid fa-plus text-purple-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#fed7aa')" class="w-6 h-6 rounded-lg bg-orange-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增暖橘便利貼"><i class="fa-solid fa-plus text-orange-700 opacity-60 text-xs"></i></button>
+                    <button onclick="createNewNote('#e2e8f0')" class="w-6 h-6 rounded-lg bg-slate-200 hover:scale-110 transition-transform shadow-xs flex items-center justify-center" title="新增簡約灰便利貼"><i class="fa-solid fa-plus text-slate-700 opacity-60 text-xs"></i></button>
+                </div>
+
+                <div class="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                <!-- 佈局切換 -->
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 text-xs font-medium">
+                    <button id="layoutFreeBtn" onclick="setLayoutMode('free')" class="px-2.5 py-1 rounded-lg bg-white text-amber-600 shadow-xs font-bold transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-hand-pointer text-xs"></i> <span class="hidden sm:inline">自由拖曳</span>
+                    </button>
+                    <button id="layoutGridBtn" onclick="setLayoutMode('grid')" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-table-cells text-xs"></i> <span class="hidden sm:inline">整齊網格</span>
                     </button>
                 </div>
 
-                <!-- Task Options: Category, Priority, Due Date -->
-                <div class="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100 text-xs">
-                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
-                        <i class="fa-solid fa-tag text-slate-400"></i>
-                        <label for="categorySelect" class="text-slate-500 font-medium">分類：</label>
-                        <select id="categorySelect" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
-                            <option value="工作">工作</option>
-                            <option value="生活" selected>生活</option>
-                            <option value="學習">學習</option>
-                            <option value="健康">健康</option>
-                        </select>
-                    </div>
+                <div class="h-5 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
-                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
-                        <i class="fa-solid fa-flag text-slate-400"></i>
-                        <label for="prioritySelect" class="text-slate-500 font-medium">優先級：</label>
-                        <select id="prioritySelect" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
-                            <option value="high">高優先</option>
-                            <option value="medium" selected>中優先</option>
-                            <option value="low">低優先</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
-                        <i class="fa-regular fa-calendar-check text-slate-400"></i>
-                        <label for="dueDateInput" class="text-slate-500 font-medium">截止日：</label>
-                        <input type="date" id="dueDateInput" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
-                    </div>
+                <!-- 匯出 / 匯入 / 清空備份 -->
+                <div class="flex items-center gap-1">
+                    <button onclick="exportData()" class="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded-xl text-sm transition-colors" title="匯出 JSON 備份">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                    <label class="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded-xl text-sm transition-colors cursor-pointer" title="匯入 JSON 備份">
+                        <i class="fa-solid fa-upload"></i>
+                        <input type="file" id="importFile" accept=".json" onchange="importData(event)" class="hidden">
+                    </label>
+                    <button onclick="confirmClearAll()" class="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl text-sm transition-colors" title="清空看板">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
                 </div>
-            </form>
-        </div>
 
-        <!-- Controls & Filters -->
-        <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 p-4 mb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <!-- Filter Tabs -->
-            <div class="flex items-center p-1 bg-emerald-50/80 rounded-xl w-full md:w-auto text-xs font-medium">
-                <button data-filter="all" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 active-tab transition-all">全部</button>
-                <button data-filter="active" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 transition-all">進行中</button>
-                <button data-filter="completed" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 transition-all">已完成</button>
-            </div>
-
-            <!-- Search and Action -->
-            <div class="flex items-center gap-3 w-full md:w-auto">
-                <div class="relative flex-1 md:w-48">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="searchInput" placeholder="搜尋事項..." class="w-full pl-8 pr-3 py-1.5 bg-emerald-50/30 border border-emerald-100 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                </div>
-                <button id="clearCompletedBtn" class="text-xs text-slate-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:border-red-200 hover:bg-red-50/50 transition-all flex items-center gap-1.5 whitespace-nowrap">
-                    <i class="fa-regular fa-trash-can"></i> 清除已完成
-                </button>
             </div>
         </div>
+    </header>
 
-        <!-- Task List Area -->
-        <div class="space-y-3">
-            <ul id="todoList" class="space-y-2.5 min-h-[150px]">
-                <!-- Dynamic Todolist Items Will Be Inserted Here -->
-            </ul>
-
-            <!-- Empty State -->
-            <div id="emptyState" class="hidden flex-col items-center justify-center py-12 px-4 text-center bg-white rounded-2xl border border-dashed border-emerald-200">
-                <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-2xl mb-3">
-                    <i class="fa-solid fa-clipboard-check"></i>
-                </div>
-                <h3 class="text-base font-semibold text-slate-700">目前沒有待辦事項</h3>
-                <p class="text-xs text-slate-400 mt-1 max-w-sm">在上方的輸入框新增任務，或調整篩選條件查看其他事項！</p>
+    <!-- 看板的主要區域 -->
+    <main class="flex-1 relative w-full overflow-auto p-4" id="main-container">
+        
+        <!-- 當沒有便利貼時的無障礙提示訊息 -->
+        <div id="empty-state" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none z-0">
+            <div class="w-20 h-20 bg-amber-100/90 rounded-3xl flex items-center justify-center text-amber-500 mb-4 shadow-sm">
+                <i class="fa-solid fa-pencil text-3xl"></i>
             </div>
+            <h3 class="text-lg font-bold text-slate-700 mb-1">便利貼看板是空的</h3>
+            <p class="text-sm text-slate-500 max-w-sm mb-6">點擊上方顏色的「+」號按鈕，記錄下您的第一個想法吧！</p>
+            <button onclick="createNewNote('#fef08a')" class="pointer-events-auto bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-plus"></i> 新增第一張便利貼
+            </button>
         </div>
 
-        <!-- Footer -->
-        <footer class="mt-8 text-center text-xs text-slate-400">
-            <p>TaskMaster App &bull; 資料將自動儲存於您的瀏覽器本機快取 (LocalStorage)</p>
-        </footer>
-    </div>
+        <!-- 動態便利貼繪製 Canvas -->
+        <div id="board-canvas" class="w-full h-full relative"><div id="note-note_1790236999123_viigc" class="sticky-note rounded-2xl p-4 flex flex-col justify-between select-none group border border-black/5" style="position: absolute; left: 350px; top: 60px; width: 270px; z-index: 106; transform: rotate(2deg); background-color: rgb(191, 219, 254);">
+                <!-- 頂部卡片列 -->
+                <div class="flex items-center justify-between mb-2 handle cursor-move pb-1.5 border-b border-black/5">
+                    <!-- Pin 釘子 -->
+                    <button onclick="togglePin('note_1790236999123_viigc')" class="text-slate-700/60 hover:text-red-500 transition-colors p-1" title="釘住便利貼">
+                        <i class="fa-solid fa-thumbtack opacity-40 text-xs"></i>
+                    </button>
 
-    <script>
-        // App State
-        let todos = [];
-        let currentFilter = 'all';
-        let searchQuery = '';
-
-        // DOM Elements
-        const todoForm = document.getElementById('todoForm');
-        const todoInput = document.getElementById('todoInput');
-        const categorySelect = document.getElementById('categorySelect');
-        const prioritySelect = document.getElementById('prioritySelect');
-        const dueDateInput = document.getElementById('dueDateInput');
-        const todoList = document.getElementById('todoList');
-        const emptyState = document.getElementById('emptyState');
-        const filterBtns = document.querySelectorAll('.filter-btn');
-        const searchInput = document.getElementById('searchInput');
-        const clearCompletedBtn = document.getElementById('clearCompletedBtn');
-        const progressCircle = document.getElementById('progressCircle');
-        const progressPercent = document.getElementById('progressPercent');
-        const completedCountEl = document.getElementById('completedCount');
-        const totalCountEl = document.getElementById('totalCount');
-
-        // Safe Storage Helper to handle Browser / iFrame Storage restrictions
-        const storage = {
-            getItem(key) {
-                try {
-                    return localStorage.getItem(key);
-                } catch (e) {
-                    console.warn('LocalStorage 讀取受限，切換至暫存模式:', e);
-                    return this._memoryStorage ? this._memoryStorage[key] : null;
-                }
-            },
-            setItem(key, value) {
-                try {
-                    localStorage.setItem(key, value);
-                } catch (e) {
-                    console.warn('LocalStorage 寫入受限，切換至暫存模式:', e);
-                    if (!this._memoryStorage) this._memoryStorage = {};
-                    this._memoryStorage[key] = value;
-                }
-            }
-        };
-
-        // Save to LocalStorage safely
-        function saveTodos() {
-            storage.setItem('taskmaster_todos', JSON.stringify(todos));
-            updateStats();
-        }
-
-        // Load from LocalStorage safely
-        function loadTodos() {
-            try {
-                const saved = storage.getItem('taskmaster_todos');
-                if (saved !== null && saved !== undefined) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed)) {
-                        todos = parsed;
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error('從 LocalStorage 載入資料失敗:', e);
-            }
-
-            // Initial Default Sample Tasks if empty or first load
-            todos = [
-                {
-                    id: Date.now() - 2,
-                    text: '歡迎使用 TaskMaster！點擊核取方框完成任務',
-                    category: '生活',
-                    priority: 'high',
-                    dueDate: '',
-                    completed: false,
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: Date.now() - 1,
-                    text: '嘗試新增一筆屬於你的待辦事項',
-                    category: '工作',
-                    priority: 'medium',
-                    dueDate: '',
-                    completed: true,
-                    createdAt: new Date().toISOString()
-                }
-            ];
-            saveTodos();
-        }
-
-        // Add Todo Item
-        function addTodo(text, category, priority, dueDate) {
-            const newTodo = {
-                id: Date.now(),
-                text: text.trim(),
-                category: category || '生活',
-                priority: priority || 'medium',
-                dueDate: dueDate || '',
-                completed: false,
-                createdAt: new Date().toISOString()
-            };
-
-            todos.unshift(newTodo); // Add to beginning
-            saveTodos();
-            renderTodos();
-        }
-
-        // Toggle Todo Status
-        function toggleTodo(id) {
-            todos = todos.map(todo => {
-                if (todo.id === id) {
-                    return { ...todo, completed: !todo.completed };
-                }
-                return todo;
-            });
-            saveTodos();
-            renderTodos();
-        }
-
-        // Delete Todo Item
-        function deleteTodo(id) {
-            todos = todos.filter(todo => todo.id !== id);
-            saveTodos();
-            renderTodos();
-        }
-
-        // Edit Todo Text
-        function editTodo(id, newText) {
-            if (!newText.trim()) return;
-            todos = todos.map(todo => {
-                if (todo.id === id) {
-                    return { ...todo, text: newText.trim() };
-                }
-                return todo;
-            });
-            saveTodos();
-            renderTodos();
-        }
-
-        // Clear Completed Tasks
-        function clearCompleted() {
-            todos = todos.filter(todo => !todo.completed);
-            saveTodos();
-            renderTodos();
-        }
-
-        // Calculate Statistics and Progress
-        function updateStats() {
-            const total = todos.length;
-            const completed = todos.filter(t => t.completed).length;
-            const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-            totalCountEl.textContent = total;
-            completedCountEl.textContent = completed;
-            progressPercent.textContent = `${percentage}%`;
-
-            // SVG Circle Circumference is 100 in scale
-            progressCircle.setAttribute('stroke-dasharray', `${percentage}, 100`);
-        }
-
-        // Get badge color by priority
-        function getPriorityBadgeHtml(priority) {
-            switch (priority) {
-                case 'high':
-                    return `<span class="bg-red-50 text-red-600 border border-red-100 text-[10px] font-bold px-2 py-0.5 rounded-full"><i class="fa-solid fa-angle-up"></i> 高</span>`;
-                case 'medium':
-                    return `<span class="bg-amber-50 text-amber-600 border border-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-full">中</span>`;
-                case 'low':
-                    return `<span class="bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold px-2 py-0.5 rounded-full"><i class="fa-solid fa-angle-down"></i> 低</span>`;
-                default:
-                    return '';
-            }
-        }
-
-        // Get badge color by category
-        function getCategoryBadgeHtml(category) {
-            const colors = {
-                '工作': 'bg-emerald-100/80 text-emerald-800 border-emerald-200',
-                '生活': 'bg-teal-50 text-teal-700 border-teal-200',
-                '學習': 'bg-lime-50 text-lime-800 border-lime-200',
-                '健康': 'bg-rose-50 text-rose-700 border-rose-200'
-            };
-            const classNames = colors[category] || 'bg-slate-50 text-slate-600 border-slate-100';
-            return `<span class="${classNames} border text-[10px] font-semibold px-2 py-0.5 rounded-md">${category}</span>`;
-        }
-
-        // Render Todolist
-        function renderTodos() {
-            // Filter logic
-            let filteredTodos = todos.filter(todo => {
-                if (currentFilter === 'active') return !todo.completed;
-                if (currentFilter === 'completed') return todo.completed;
-                return true;
-            });
-
-            // Search query logic
-            if (searchQuery.trim()) {
-                filteredTodos = filteredTodos.filter(todo => 
-                    todo.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    todo.category.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-            }
-
-            // Render Empty State
-            if (filteredTodos.length === 0) {
-                todoList.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                emptyState.classList.add('flex');
-            } else {
-                emptyState.classList.add('hidden');
-                emptyState.classList.remove('flex');
-
-                todoList.innerHTML = filteredTodos.map(todo => `
-                    <li data-id="${todo.id}" class="group bg-white p-3.5 sm:p-4 rounded-xl border border-emerald-100/80 shadow-sm hover:border-emerald-300 hover:shadow transition-all duration-200 flex items-center justify-between gap-3 ${todo.completed ? 'bg-emerald-50/30 border-slate-200/50' : ''}">
-                        <!-- Left Checkbox & Text -->
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <button onclick="toggleTodo(${todo.id})" class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${todo.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-emerald-500 bg-white'}">
-                                ${todo.completed ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                    <!-- 色彩盤與選單 -->
+                    <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div class="relative group/color">
+                            <button class="w-5 h-5 rounded-full border border-black/10 flex items-center justify-center text-[10px] text-slate-600 hover:scale-110 transition-transform bg-white/60">
+                                <i class="fa-solid fa-palette"></i>
                             </button>
-                            
-                            <div class="flex flex-col min-w-0 flex-1">
-                                <span class="todo-text text-sm font-medium text-slate-800 break-words cursor-pointer ${todo.completed ? 'completed-item text-slate-400' : ''}" onclick="toggleTodo(${todo.id})">
-                                    ${escapeHtml(todo.text)}
-                                </span>
+                            <!-- 下拉色彩庫 -->
+                            <div class="absolute right-0 top-6 hidden group-hover/color:flex bg-white/95 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-slate-200/80 gap-1 z-50">
                                 
-                                <!-- Meta Badges -->
-                                <div class="flex items-center flex-wrap gap-2 mt-1.5">
-                                    ${getCategoryBadgeHtml(todo.category)}
-                                    ${getPriorityBadgeHtml(todo.priority)}
-                                    ${todo.dueDate ? `
-                                        <span class="text-[10px] text-slate-400 flex items-center gap-1">
-                                            <i class="fa-regular fa-clock"></i> ${todo.dueDate}
-                                        </span>
-                                    ` : ''}
-                                </div>
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#fef08a')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fef08a"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#fbcfe8')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fbcfe8"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#bbf7d0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bbf7d0"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#bfdbfe')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bfdbfe"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#e9d5ff')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e9d5ff"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#fed7aa')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fed7aa"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_viigc', '#e2e8f0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e2e8f0"></button>
+                                
                             </div>
                         </div>
 
-                        <!-- Right Action Buttons -->
-                        <div class="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="promptEdit(${todo.id}, '${escapeHtml(todo.text)}')" class="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors" title="編輯事項">
-                                <i class="fa-regular fa-pen-to-square text-sm"></i>
+                        <!-- 刪除按鈕 -->
+                        <button onclick="deleteNote('note_1790236999123_viigc')" class="text-slate-600 hover:text-red-600 p-1 rounded-lg hover:bg-black/5 transition-colors text-xs" title="刪除便利貼">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 內容可編輯區 -->
+                <div id="content-note_1790236999123_viigc" contenteditable="true" spellcheck="false" class="note-content flex-1 text-slate-800 font-medium leading-relaxed min-h-[110px] max-h-[280px] overflow-y-auto whitespace-pre-wrap break-words text-base px-1 py-1" placeholder="請輸入事項...">🎨 提示：點擊右上角的畫板圖示，隨時可以為這張便利貼切換不同的柔和顏色喔！</div>
+
+                <!-- 底部 Tag 與時間 -->
+                <div class="mt-3 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-sans border-t border-black/5">
+                    <input type="text" value="色彩選擇" placeholder="+ 增加標籤" onblur="updateNoteTag('note_1790236999123_viigc', this.value)" class="tag-pill w-24 bg-white/40 focus:bg-white focus:outline-none border-0 text-slate-600 placeholder-slate-400">
+                    <span id="time-note_1790236999123_viigc" class="opacity-75 font-medium">今天 16:03</span>
+                </div>
+            </div><div id="note-note_1790237002950_dt7zw" class="sticky-note rounded-2xl p-4 flex flex-col justify-between select-none group border border-black/5" style="position: absolute; left: 822.595px; top: 14.3594px; width: 270px; z-index: 111; transform: rotate(0.7deg); background-color: rgb(233, 213, 255);">
+                <!-- 頂部卡片列 -->
+                <div class="flex items-center justify-between mb-2 handle cursor-move pb-1.5 border-b border-black/5">
+                    <!-- Pin 釘子 -->
+                    <button onclick="togglePin('note_1790237002950_dt7zw')" class="text-slate-700/60 hover:text-red-500 transition-colors p-1" title="釘住便利貼">
+                        <i class="fa-solid fa-thumbtack opacity-40 text-xs"></i>
+                    </button>
+
+                    <!-- 色彩盤與選單 -->
+                    <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div class="relative group/color">
+                            <button class="w-5 h-5 rounded-full border border-black/10 flex items-center justify-center text-[10px] text-slate-600 hover:scale-110 transition-transform bg-white/60">
+                                <i class="fa-solid fa-palette"></i>
                             </button>
-                            <button onclick="deleteTodo(${todo.id})" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="刪除事項">
-                                <i class="fa-regular fa-trash-can text-sm"></i>
-                            </button>
+                            <!-- 下拉色彩庫 -->
+                            <div class="absolute right-0 top-6 hidden group-hover/color:flex bg-white/95 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-slate-200/80 gap-1 z-50">
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#fef08a')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fef08a"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#fbcfe8')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fbcfe8"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#bbf7d0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bbf7d0"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#bfdbfe')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bfdbfe"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#e9d5ff')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e9d5ff"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#fed7aa')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fed7aa"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790237002950_dt7zw', '#e2e8f0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e2e8f0"></button>
+                                
+                            </div>
                         </div>
-                    </li>
-                `).join('');
-            }
-        }
 
-        // Helper to escape HTML to prevent XSS
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+                        <!-- 刪除按鈕 -->
+                        <button onclick="deleteNote('note_1790237002950_dt7zw')" class="text-slate-600 hover:text-red-600 p-1 rounded-lg hover:bg-black/5 transition-colors text-xs" title="刪除便利貼">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
 
-        // Prompt for Editing Todo
-        function promptEdit(id, oldText) {
-            const newText = prompt('編輯待辦事項：', oldText);
-            if (newText !== null) {
-                editTodo(id, newText);
-            }
-        }
+                <!-- 內容可編輯區 -->
+                <div id="content-note_1790237002950_dt7zw" contenteditable="true" spellcheck="false" class="note-content flex-1 text-slate-800 font-medium leading-relaxed min-h-[110px] max-h-[280px] overflow-y-auto whitespace-pre-wrap break-words text-base px-1 py-1" placeholder="請輸入事項...">歐耶修好了</div>
 
-        // Event Listeners Initialization
-        function initEventListeners() {
-            // Form Submit Event
-            todoForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const text = todoInput.value;
-                const category = categorySelect.value;
-                const priority = prioritySelect.value;
-                const dueDate = dueDateInput.value;
+                <!-- 底部 Tag 與時間 -->
+                <div class="mt-3 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-sans border-t border-black/5">
+                    <input type="text" value="" placeholder="+ 增加標籤" onblur="updateNoteTag('note_1790237002950_dt7zw', this.value)" class="tag-pill w-24 bg-white/40 focus:bg-white focus:outline-none border-0 text-slate-600 placeholder-slate-400">
+                    <span id="time-note_1790237002950_dt7zw" class="opacity-75 font-medium">今天 16:03</span>
+                </div>
+            </div><div id="note-note_1790236999123_ua60k" class="sticky-note rounded-2xl p-4 flex flex-col justify-between select-none group border border-black/5" style="position: absolute; left: 40px; top: 40px; width: 270px; z-index: 107; transform: rotate(-1.5deg); background-color: rgb(254, 240, 138);">
+                <!-- 頂部卡片列 -->
+                <div class="flex items-center justify-between mb-2 handle cursor-move pb-1.5 border-b border-black/5">
+                    <!-- Pin 釘子 -->
+                    <button onclick="togglePin('note_1790236999123_ua60k')" class="text-slate-700/60 hover:text-red-500 transition-colors p-1" title="取消釘住">
+                        <i class="fa-solid fa-thumbtack text-red-500 -rotate-45 pinned-badge text-base"></i>
+                    </button>
 
-                if (text) {
-                    addTodo(text, category, priority, dueDate);
-                    todoInput.value = '';
-                    dueDateInput.value = '';
-                    todoInput.focus();
-                }
-            });
+                    <!-- 色彩盤與選單 -->
+                    <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div class="relative group/color">
+                            <button class="w-5 h-5 rounded-full border border-black/10 flex items-center justify-center text-[10px] text-slate-600 hover:scale-110 transition-transform bg-white/60">
+                                <i class="fa-solid fa-palette"></i>
+                            </button>
+                            <!-- 下拉色彩庫 -->
+                            <div class="absolute right-0 top-6 hidden group-hover/color:flex bg-white/95 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-slate-200/80 gap-1 z-50">
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#fef08a')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fef08a"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#fbcfe8')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fbcfe8"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#bbf7d0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bbf7d0"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#bfdbfe')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #bfdbfe"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#e9d5ff')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e9d5ff"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#fed7aa')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #fed7aa"></button>
+                                
+                                    <button onclick="changeNoteColor('note_1790236999123_ua60k', '#e2e8f0')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: #e2e8f0"></button>
+                                
+                            </div>
+                        </div>
 
-            // Filter Tabs Click
-            filterBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    filterBtns.forEach(b => {
-                        b.classList.remove('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
-                        b.classList.add('text-slate-600');
-                    });
-                    btn.classList.add('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
-                    btn.classList.remove('text-slate-600');
+                        <!-- 刪除按鈕 -->
+                        <button onclick="deleteNote('note_1790236999123_ua60k')" class="text-slate-600 hover:text-red-600 p-1 rounded-lg hover:bg-black/5 transition-colors text-xs" title="刪除便利貼">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
 
-                    currentFilter = btn.dataset.filter;
-                    renderTodos();
-                });
-            });
+                <!-- 內容可編輯區 -->
+                <div id="content-note_1790236999123_ua60k" contenteditable="true" spellcheck="false" class="note-content flex-1 text-slate-800 font-medium leading-relaxed min-h-[110px] max-h-[280px] overflow-y-auto whitespace-pre-wrap break-words text-base px-1 py-1" placeholder="請輸入事項...">歡迎使用「便利貼看板」！✍️
 
-            // Set Active Tab Initial Style
-            document.querySelector('.filter-btn[data-filter="all"]').classList.add('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
+• 所有零散想法都有其意義，寫下來吧！
+• 點擊內文即可直接編輯內容
+• 滑鼠按住上方可自由拖曳便利貼
+• 支援釘選 Pin 重要備忘記錄</div>
 
-            // Search Input Event
-            searchInput.addEventListener('input', (e) => {
-                searchQuery = e.target.value;
-                renderTodos();
-            });
+                <!-- 底部 Tag 與時間 -->
+                <div class="mt-3 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-sans border-t border-black/5">
+                    <input type="text" value="使用指南" placeholder="+ 增加標籤" onblur="updateNoteTag('note_1790236999123_ua60k', this.value)" class="tag-pill w-24 bg-white/40 focus:bg-white focus:outline-none border-0 text-slate-600 placeholder-slate-400">
+                    <span id="time-note_1790236999123_ua60k" class="opacity-75 font-medium">今天 16:03</span>
+                </div>
+            </div></div>
 
-            // Clear Completed Event
-            clearCompletedBtn.addEventListener('click', () => {
-                const completedCount = todos.filter(t => t.completed).length;
-                if (completedCount === 0) return;
-                clearCompleted();
-            });
-        }
+    </main>
 
-        // App Initializer
-        window.onload = function() {
-            loadTodos();
-            initEventListeners();
-            renderTodos();
+    <!-- 自訂刪除確認視窗 -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-200" id="modal-box">
+            <div id="modal-icon" class="w-12 h-12 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="modal-title" class="text-lg font-bold text-center text-slate-800 mb-2">確認要清空所有便利貼嗎？</h3>
+            <p id="modal-message" class="text-sm text-slate-600 text-center mb-6">此動作將清理所有的記錄，且無法恢復。建議先匯出 JSON 備份！</p>
+            <div class="flex gap-3">
+                <button id="modal-cancel-btn" onclick="closeModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm">取消</button>
+                <button id="modal-confirm-btn" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors text-sm shadow-sm">清空</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 便利貼看板核心應用邏輯
+         * 色彩對應表
+         */
+        const COLOR_MAP = {
+            '#fef08a': { name: '經典黃', border: '#fde047' },
+            '#fbcfe8': { name: '櫻花粉', border: '#f472b6' },
+            '#bbf7d0': { name: '薄荷綠', border: '#4ade80' },
+            '#bfdbfe': { name: '晴空藍', border: '#60a5fa' },
+            '#e9d5ff': { name: '薰衣草紫', border: '#c084fc' },
+            '#fed7aa': { name: '暖陽橘', border: '#fb923c' },
+            '#e2e8f0': { name: '質感灰', border: '#cbd5e1' }
         };
+
+        // 核心 State 變數
+        let notes = [];
+        let layoutMode = 'free'; // 'free' 自由位置拖曳 或 'grid' 整齊網格
+        let activeDragNoteId = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let maxZIndex = 100;
+
+        // DOM 節點引用
+        const canvas = document.getElementById('board-canvas');
+        const emptyState = document.getElementById('empty-state');
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const layoutFreeBtn = document.getElementById('layoutFreeBtn');
+        const layoutGridBtn = document.getElementById('layoutGridBtn');
+
+        // 頁面初次載入
+        window.addEventListener('DOMContentLoaded', () => {
+            loadNotesFromLocalStorage();
+            loadSettings();
+            renderNotes();
+        });
+
+        // 1. 讀取 LocalStorage
+        function loadNotesFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('sticky_notes_genjyuu_data');
+                if (saved) {
+                    notes = JSON.parse(saved);
+                } else {
+                    // 預設示範便利貼內容
+                    notes = [
+                        {
+                            id: generateId(),
+                            content: '歡迎使用「便利貼看板」！✍️\n\n• 所有零散想法都有其意義，寫下來吧！\n• 點擊內文即可直接編輯內容\n• 滑鼠按住上方可自由拖曳便利貼\n• 支援釘選 Pin 重要備忘記錄',
+                            color: '#fef08a',
+                            x: 40,
+                            y: 40,
+                            pinned: true,
+                            rotation: -1.5,
+                            updatedAt: new Date().toISOString(),
+                            zIndex: 10,
+                            tag: '使用指南'
+                        },
+                        {
+                            id: generateId(),
+                            content: '🎨 提示：點擊右上角的畫板圖示，隨時可以為這張便利貼切換不同的柔和顏色喔！',
+                            color: '#bfdbfe',
+                            x: 350,
+                            y: 60,
+                            pinned: false,
+                            rotation: 2,
+                            updatedAt: new Date().toISOString(),
+                            zIndex: 11,
+                            tag: '色彩選擇'
+                        }
+                    ];
+                    saveNotesToLocalStorage();
+                }
+            } catch (e) {
+                console.error('讀取 LocalStorage 失敗:', e);
+                notes = [];
+            }
+        }
+
+        // 2. 儲存 LocalStorage
+        function saveNotesToLocalStorage() {
+            try {
+                localStorage.setItem('sticky_notes_genjyuu_data', JSON.stringify(notes));
+            } catch (e) {
+                console.error('儲存至 LocalStorage 失敗:', e);
+            }
+        }
+
+        // 3. 讀取與更新 Layout 設定
+        function loadSettings() {
+            const savedLayout = localStorage.getItem('sticky_notes_layout');
+            if (savedLayout && (savedLayout === 'free' || savedLayout === 'grid')) {
+                layoutMode = savedLayout;
+            }
+            updateLayoutUI();
+        }
+
+        function setLayoutMode(mode) {
+            layoutMode = mode;
+            localStorage.setItem('sticky_notes_layout', mode);
+            updateLayoutUI();
+            renderNotes();
+        }
+
+        function updateLayoutUI() {
+            if (layoutMode === 'free') {
+                layoutFreeBtn.className = "px-2.5 py-1 rounded-lg bg-white text-amber-600 shadow-xs font-bold transition-all flex items-center gap-1";
+                layoutGridBtn.className = "px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all flex items-center gap-1";
+                canvas.className = "w-full h-full relative";
+            } else {
+                layoutGridBtn.className = "px-2.5 py-1 rounded-lg bg-white text-amber-600 shadow-xs font-bold transition-all flex items-center gap-1";
+                layoutFreeBtn.className = "px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all flex items-center gap-1";
+                canvas.className = "w-full grid-view-container";
+            }
+        }
+
+        // 隨機 UUID 輔助函式
+        function generateId() {
+            return 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        }
+
+        // 新增便利貼
+        function createNewNote(color = '#fef08a') {
+            const offset = (notes.length % 7) * 25;
+            const newNote = {
+                id: generateId(),
+                content: '',
+                color: color,
+                x: 60 + offset,
+                y: 60 + offset,
+                pinned: false,
+                rotation: (Math.random() * 4 - 2).toFixed(1), // 輕微自然旋轉
+                updatedAt: new Date().toISOString(),
+                zIndex: ++maxZIndex,
+                tag: ''
+            };
+
+            notes.unshift(newNote);
+            saveNotesToLocalStorage();
+            renderNotes();
+
+            // 自動聚焦輸入內容
+            setTimeout(() => {
+                const elem = document.getElementById(`content-${newNote.id}`);
+                if (elem) elem.focus();
+            }, 60);
+        }
+
+        // 刪除便利貼
+        function deleteNote(id) {
+            notes = notes.filter(n => n.id !== id);
+            saveNotesToLocalStorage();
+            renderNotes();
+        }
+
+        // 切換 Pin 釘住狀態
+        function togglePin(id) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.pinned = !note.pinned;
+                note.updatedAt = new Date().toISOString();
+                saveNotesToLocalStorage();
+                renderNotes();
+            }
+        }
+
+        // 變更便利貼色彩
+        function changeNoteColor(id, newColor) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.color = newColor;
+                note.updatedAt = new Date().toISOString();
+                saveNotesToLocalStorage();
+                renderNotes();
+            }
+        }
+
+        // 即時更新便利貼文字
+        function updateNoteContent(id, content) {
+            const note = notes.find(n => n.id === id);
+            if (note && note.content !== content) {
+                note.content = content;
+                note.updatedAt = new Date().toISOString();
+                saveNotesToLocalStorage();
+
+                const timeElem = document.getElementById(`time-${id}`);
+                if (timeElem) {
+                    timeElem.innerText = formatDate(note.updatedAt);
+                }
+            }
+        }
+
+        // 更新便利貼標籤 Tag
+        function updateNoteTag(id, tagText) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.tag = tagText.trim();
+                saveNotesToLocalStorage();
+            }
+        }
+
+        // 搜尋發動與清除
+        function clearSearch() {
+            searchInput.value = '';
+            renderNotes();
+        }
+
+        // 繪製與渲染所有便利貼
+        function renderNotes() {
+            const query = searchInput.value.trim().toLowerCase();
+            clearSearchBtn.style.display = query ? 'block' : 'none';
+
+            // 搜尋關鍵字過濾
+            let filtered = notes.filter(note => 
+                note.content.toLowerCase().includes(query) || 
+                (note.tag && note.tag.toLowerCase().includes(query))
+            );
+
+            // Pinned 釘住的便利貼優先排在前端/最上層
+            filtered.sort((a, b) => {
+                if (a.pinned === b.pinned) {
+                    return (a.zIndex || 0) - (b.zIndex || 0);
+                }
+                return a.pinned ? 1 : -1;
+            });
+
+            // 控制空狀態
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            canvas.innerHTML = '';
+
+            filtered.forEach(note => {
+                const noteElem = createNoteDOM(note);
+                canvas.appendChild(noteElem);
+            });
+        }
+
+        // 打造單張便利貼 DOM 結構
+        function createNoteDOM(note) {
+            const div = document.createElement('div');
+            div.id = `note-${note.id}`;
+
+            let posStyle = '';
+            if (layoutMode === 'free') {
+                posStyle = `position: absolute; left: ${note.x}px; top: ${note.y}px; width: 270px; z-index: ${note.zIndex || 1}; transform: rotate(${note.rotation || 0}deg);`;
+            } else {
+                posStyle = `position: relative; width: 100%; transform: rotate(${note.rotation || 0}deg);`;
+            }
+
+            div.style = posStyle;
+            div.className = `sticky-note rounded-2xl p-4 flex flex-col justify-between select-none group border border-black/5`;
+            div.style.backgroundColor = note.color || '#fef08a';
+
+            const formattedTime = formatDate(note.updatedAt);
+
+            div.innerHTML = `
+                <!-- 頂部卡片列 -->
+                <div class="flex items-center justify-between mb-2 handle cursor-move pb-1.5 border-b border-black/5">
+                    <!-- Pin 釘子 -->
+                    <button onclick="togglePin('${note.id}')" class="text-slate-700/60 hover:text-red-500 transition-colors p-1" title="${note.pinned ? '取消釘住' : '釘住便利貼'}">
+                        <i class="fa-solid fa-thumbtack ${note.pinned ? 'text-red-500 -rotate-45 pinned-badge text-base' : 'opacity-40 text-xs'}"></i>
+                    </button>
+
+                    <!-- 色彩盤與選單 -->
+                    <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div class="relative group/color">
+                            <button class="w-5 h-5 rounded-full border border-black/10 flex items-center justify-center text-[10px] text-slate-600 hover:scale-110 transition-transform bg-white/60">
+                                <i class="fa-solid fa-palette"></i>
+                            </button>
+                            <!-- 下拉色彩庫 -->
+                            <div class="absolute right-0 top-6 hidden group-hover/color:flex bg-white/95 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-slate-200/80 gap-1 z-50">
+                                ${Object.keys(COLOR_MAP).map(hex => `
+                                    <button onclick="changeNoteColor('${note.id}', '${hex}')" class="w-5 h-5 rounded-md hover:scale-110 transition-transform border border-black/10" style="background-color: ${hex}"></button>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- 刪除按鈕 -->
+                        <button onclick="deleteNote('${note.id}')" class="text-slate-600 hover:text-red-600 p-1 rounded-lg hover:bg-black/5 transition-colors text-xs" title="刪除便利貼">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 內容可編輯區 -->
+                <div id="content-${note.id}" 
+                     contenteditable="true" 
+                     spellcheck="false"
+                     class="note-content flex-1 text-slate-800 font-medium leading-relaxed min-h-[110px] max-h-[280px] overflow-y-auto whitespace-pre-wrap break-words text-base px-1 py-1"
+                     placeholder="請輸入事項...">${escapeHtml(note.content)}</div>
+
+                <!-- 底部 Tag 與時間 -->
+                <div class="mt-3 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-sans border-t border-black/5">
+                    <input type="text" 
+                           value="${escapeHtml(note.tag || '')}" 
+                           placeholder="+ 增加標籤"
+                           onblur="updateNoteTag('${note.id}', this.value)"
+                           class="tag-pill w-24 bg-white/40 focus:bg-white focus:outline-none border-0 text-slate-600 placeholder-slate-400">
+                    <span id="time-${note.id}" class="opacity-75 font-medium">${formattedTime}</span>
+                </div>
+            `;
+
+            // 設定拖曳監聽事件（自由拖曳模式）
+            if (layoutMode === 'free') {
+                const handle = div.querySelector('.handle');
+                handle.addEventListener('mousedown', (e) => startDrag(e, note.id));
+                handle.addEventListener('touchstart', (e) => startDrag(e, note.id), { passive: false });
+            }
+
+            // Blur 儲存文字
+            const contentElem = div.querySelector(`#content-${note.id}`);
+            contentElem.addEventListener('blur', () => {
+                updateNoteContent(note.id, contentElem.innerText.trim());
+            });
+
+            // 點擊提升 Z-Index
+            div.addEventListener('mousedown', () => {
+                note.zIndex = ++maxZIndex;
+                div.style.zIndex = note.zIndex;
+            });
+
+            return div;
+        }
+
+        // 拖曳 logic
+        function startDrag(e, id) {
+            if (layoutMode !== 'free') return;
+            if (e.target.closest('button') || e.target.closest('input')) return;
+
+            activeDragNoteId = id;
+            const noteElem = document.getElementById(`note-${id}`);
+            const note = notes.find(n => n.id === id);
+
+            if (!noteElem || !note) return;
+
+            note.zIndex = ++maxZIndex;
+            noteElem.style.zIndex = note.zIndex;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const rect = noteElem.getBoundingClientRect();
+
+            dragOffsetX = clientX - rect.left;
+            dragOffsetY = clientY - rect.top;
+
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function onDrag(e) {
+            if (!activeDragNoteId || layoutMode !== 'free') return;
+            if (e.cancelable) e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            let newX = clientX - canvasRect.left - dragOffsetX;
+            let newY = clientY - canvasRect.top - dragOffsetY;
+
+            // 邊界防禦限制
+            newX = Math.max(10, Math.min(newX, canvasRect.width - 250));
+            newY = Math.max(10, newY);
+
+            const note = notes.find(n => n.id === activeDragNoteId);
+            if (note) {
+                note.x = newX;
+                note.y = newY;
+
+                const noteElem = document.getElementById(`note-${activeDragNoteId}`);
+                if (noteElem) {
+                    noteElem.style.left = `${newX}px`;
+                    noteElem.style.top = `${newY}px`;
+                }
+            }
+        }
+
+        function stopDrag() {
+            if (activeDragNoteId) {
+                saveNotesToLocalStorage();
+                activeDragNoteId = null;
+            }
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('touchmove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
+        }
+
+        // 匯出資料 JSON
+        function exportData() {
+            if (notes.length === 0) {
+                alert('目前沒有便利貼可備份！');
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(notes, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `sticky_notes_backup_${dateStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        // 匯入 JSON 備份
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        notes = imported;
+                        saveNotesToLocalStorage();
+                        renderNotes();
+                        alert('已成功匯入便利貼！');
+                    } else {
+                        alert('無效的備份檔案格式。');
+                    }
+                } catch (err) {
+                    alert('讀取備份檔案失敗：' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // 清空對話框
+        function confirmClearAll() {
+            if (notes.length === 0) return;
+            const modal = document.getElementById('modal-overlay');
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            
+            confirmBtn.onclick = () => {
+                notes = [];
+                saveNotesToLocalStorage();
+                renderNotes();
+                closeModal();
+            };
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal-overlay');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // 格式化時間
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const d = new Date(dateString);
+            const now = new Date();
+            const isToday = d.toDateString() === now.toDateString();
+            const timeStr = d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            return isToday ? `今天 ${timeStr}` : `${d.getMonth() + 1}/${d.getDate()} ${timeStr}`;
+        }
+
+        // Escape HTML
+        function escapeHtml(str) {
+            return (str || '')
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
     </script>
-</body>
-</html>
+
+</body></html>
