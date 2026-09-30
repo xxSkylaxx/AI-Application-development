@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡待辦事項 TaskMaster</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icon CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .completed-item {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="bg-emerald-50/60 text-slate-800 font-sans min-h-screen py-6 px-4 sm:px-6 lg:px-8">
+    
+    <div class="max-w-3xl mx-auto">
+        <!-- Header & App Title -->
+        <header class="mb-6 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-emerald-950 tracking-tight flex items-center gap-3">
+                    <i class="fa-solid fa-leaf text-emerald-600"></i> TaskMaster
+                </h1>
+                <p class="text-sm text-emerald-700/70 mt-1">有效規劃每一天，輕鬆達成新目標</p>
+            </div>
+            <!-- Statistics Card -->
+            <div class="bg-white p-3 px-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4 min-w-[200px]">
+                <div class="relative w-12 h-12 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-emerald-100/60" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                        <path id="progressCircle" class="text-emerald-600 transition-all duration-500 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <span id="progressPercent" class="absolute text-xs font-bold text-emerald-900">0%</span>
+                </div>
+                <div>
+                    <div class="text-xs font-medium text-slate-400">完成進度</div>
+                    <div class="text-sm font-bold text-slate-700"><span id="completedCount">0</span> / <span id="totalCount">0</span> 已完成</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Add Task Input Form Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 p-4 sm:p-5 mb-6">
+            <form id="todoForm" class="space-y-4">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-pen-nib absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="todoInput" placeholder="想要完成什麼任務？..." class="w-full pl-11 pr-4 py-3 bg-emerald-50/30 border border-emerald-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all placeholder:text-slate-400" required>
+                    </div>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-3 rounded-xl transition-colors duration-200 shadow-sm shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]">
+                        <i class="fa-solid fa-plus"></i> 新增事項
+                    </button>
+                </div>
+
+                <!-- Task Options: Category, Priority, Due Date -->
+                <div class="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100 text-xs">
+                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-tag text-slate-400"></i>
+                        <label for="categorySelect" class="text-slate-500 font-medium">分類：</label>
+                        <select id="categorySelect" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
+                            <option value="工作">工作</option>
+                            <option value="生活" selected>生活</option>
+                            <option value="學習">學習</option>
+                            <option value="健康">健康</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-flag text-slate-400"></i>
+                        <label for="prioritySelect" class="text-slate-500 font-medium">優先級：</label>
+                        <select id="prioritySelect" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
+                            <option value="high">高優先</option>
+                            <option value="medium" selected>中優先</option>
+                            <option value="low">低優先</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg">
+                        <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                        <label for="dueDateInput" class="text-slate-500 font-medium">截止日：</label>
+                        <input type="date" id="dueDateInput" class="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer">
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Controls & Filters -->
+        <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 p-4 mb-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <!-- Filter Tabs -->
+            <div class="flex items-center p-1 bg-emerald-50/80 rounded-xl w-full md:w-auto text-xs font-medium">
+                <button data-filter="all" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 active-tab transition-all">全部</button>
+                <button data-filter="active" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 transition-all">進行中</button>
+                <button data-filter="completed" class="filter-btn flex-1 md:flex-none px-4 py-1.5 rounded-lg text-slate-600 transition-all">已完成</button>
+            </div>
+
+            <!-- Search and Action -->
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="relative flex-1 md:w-48">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" placeholder="搜尋事項..." class="w-full pl-8 pr-3 py-1.5 bg-emerald-50/30 border border-emerald-100 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                </div>
+                <button id="clearCompletedBtn" class="text-xs text-slate-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:border-red-200 hover:bg-red-50/50 transition-all flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-regular fa-trash-can"></i> 清除已完成
+                </button>
+            </div>
+        </div>
+
+        <!-- Task List Area -->
+        <div class="space-y-3">
+            <ul id="todoList" class="space-y-2.5 min-h-[150px]">
+                <!-- Dynamic Todolist Items Will Be Inserted Here -->
+            </ul>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden flex-col items-center justify-center py-12 px-4 text-center bg-white rounded-2xl border border-dashed border-emerald-200">
+                <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-2xl mb-3">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                </div>
+                <h3 class="text-base font-semibold text-slate-700">目前沒有待辦事項</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-sm">在上方的輸入框新增任務，或調整篩選條件查看其他事項！</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-xs text-slate-400">
+            <p>TaskMaster App &bull; 資料將自動儲存於您的瀏覽器本機快取 (LocalStorage)</p>
+        </footer>
+    </div>
+
+    <script>
+        // App State
+        let todos = [];
+        let currentFilter = 'all';
+        let searchQuery = '';
+
+        // DOM Elements
+        const todoForm = document.getElementById('todoForm');
+        const todoInput = document.getElementById('todoInput');
+        const categorySelect = document.getElementById('categorySelect');
+        const prioritySelect = document.getElementById('prioritySelect');
+        const dueDateInput = document.getElementById('dueDateInput');
+        const todoList = document.getElementById('todoList');
+        const emptyState = document.getElementById('emptyState');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const searchInput = document.getElementById('searchInput');
+        const clearCompletedBtn = document.getElementById('clearCompletedBtn');
+        const progressCircle = document.getElementById('progressCircle');
+        const progressPercent = document.getElementById('progressPercent');
+        const completedCountEl = document.getElementById('completedCount');
+        const totalCountEl = document.getElementById('totalCount');
+
+        // Safe Storage Helper to handle Browser / iFrame Storage restrictions
+        const storage = {
+            getItem(key) {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    console.warn('LocalStorage 讀取受限，切換至暫存模式:', e);
+                    return this._memoryStorage ? this._memoryStorage[key] : null;
+                }
+            },
+            setItem(key, value) {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    console.warn('LocalStorage 寫入受限，切換至暫存模式:', e);
+                    if (!this._memoryStorage) this._memoryStorage = {};
+                    this._memoryStorage[key] = value;
+                }
+            }
+        };
+
+        // Save to LocalStorage safely
+        function saveTodos() {
+            storage.setItem('taskmaster_todos', JSON.stringify(todos));
+            updateStats();
+        }
+
+        // Load from LocalStorage safely
+        function loadTodos() {
+            try {
+                const saved = storage.getItem('taskmaster_todos');
+                if (saved !== null && saved !== undefined) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) {
+                        todos = parsed;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error('從 LocalStorage 載入資料失敗:', e);
+            }
+
+            // Initial Default Sample Tasks if empty or first load
+            todos = [
+                {
+                    id: Date.now() - 2,
+                    text: '歡迎使用 TaskMaster！點擊核取方框完成任務',
+                    category: '生活',
+                    priority: 'high',
+                    dueDate: '',
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: Date.now() - 1,
+                    text: '嘗試新增一筆屬於你的待辦事項',
+                    category: '工作',
+                    priority: 'medium',
+                    dueDate: '',
+                    completed: true,
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            saveTodos();
+        }
+
+        // Add Todo Item
+        function addTodo(text, category, priority, dueDate) {
+            const newTodo = {
+                id: Date.now(),
+                text: text.trim(),
+                category: category || '生活',
+                priority: priority || 'medium',
+                dueDate: dueDate || '',
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+
+            todos.unshift(newTodo); // Add to beginning
+            saveTodos();
+            renderTodos();
+        }
+
+        // Toggle Todo Status
+        function toggleTodo(id) {
+            todos = todos.map(todo => {
+                if (todo.id === id) {
+                    return { ...todo, completed: !todo.completed };
+                }
+                return todo;
+            });
+            saveTodos();
+            renderTodos();
+        }
+
+        // Delete Todo Item
+        function deleteTodo(id) {
+            todos = todos.filter(todo => todo.id !== id);
+            saveTodos();
+            renderTodos();
+        }
+
+        // Edit Todo Text
+        function editTodo(id, newText) {
+            if (!newText.trim()) return;
+            todos = todos.map(todo => {
+                if (todo.id === id) {
+                    return { ...todo, text: newText.trim() };
+                }
+                return todo;
+            });
+            saveTodos();
+            renderTodos();
+        }
+
+        // Clear Completed Tasks
+        function clearCompleted() {
+            todos = todos.filter(todo => !todo.completed);
+            saveTodos();
+            renderTodos();
+        }
+
+        // Calculate Statistics and Progress
+        function updateStats() {
+            const total = todos.length;
+            const completed = todos.filter(t => t.completed).length;
+            const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+            totalCountEl.textContent = total;
+            completedCountEl.textContent = completed;
+            progressPercent.textContent = `${percentage}%`;
+
+            // SVG Circle Circumference is 100 in scale
+            progressCircle.setAttribute('stroke-dasharray', `${percentage}, 100`);
+        }
+
+        // Get badge color by priority
+        function getPriorityBadgeHtml(priority) {
+            switch (priority) {
+                case 'high':
+                    return `<span class="bg-red-50 text-red-600 border border-red-100 text-[10px] font-bold px-2 py-0.5 rounded-full"><i class="fa-solid fa-angle-up"></i> 高</span>`;
+                case 'medium':
+                    return `<span class="bg-amber-50 text-amber-600 border border-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-full">中</span>`;
+                case 'low':
+                    return `<span class="bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold px-2 py-0.5 rounded-full"><i class="fa-solid fa-angle-down"></i> 低</span>`;
+                default:
+                    return '';
+            }
+        }
+
+        // Get badge color by category
+        function getCategoryBadgeHtml(category) {
+            const colors = {
+                '工作': 'bg-emerald-100/80 text-emerald-800 border-emerald-200',
+                '生活': 'bg-teal-50 text-teal-700 border-teal-200',
+                '學習': 'bg-lime-50 text-lime-800 border-lime-200',
+                '健康': 'bg-rose-50 text-rose-700 border-rose-200'
+            };
+            const classNames = colors[category] || 'bg-slate-50 text-slate-600 border-slate-100';
+            return `<span class="${classNames} border text-[10px] font-semibold px-2 py-0.5 rounded-md">${category}</span>`;
+        }
+
+        // Render Todolist
+        function renderTodos() {
+            // Filter logic
+            let filteredTodos = todos.filter(todo => {
+                if (currentFilter === 'active') return !todo.completed;
+                if (currentFilter === 'completed') return todo.completed;
+                return true;
+            });
+
+            // Search query logic
+            if (searchQuery.trim()) {
+                filteredTodos = filteredTodos.filter(todo => 
+                    todo.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    todo.category.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+            }
+
+            // Render Empty State
+            if (filteredTodos.length === 0) {
+                todoList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+
+                todoList.innerHTML = filteredTodos.map(todo => `
+                    <li data-id="${todo.id}" class="group bg-white p-3.5 sm:p-4 rounded-xl border border-emerald-100/80 shadow-sm hover:border-emerald-300 hover:shadow transition-all duration-200 flex items-center justify-between gap-3 ${todo.completed ? 'bg-emerald-50/30 border-slate-200/50' : ''}">
+                        <!-- Left Checkbox & Text -->
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <button onclick="toggleTodo(${todo.id})" class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${todo.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-emerald-500 bg-white'}">
+                                ${todo.completed ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                            </button>
+                            
+                            <div class="flex flex-col min-w-0 flex-1">
+                                <span class="todo-text text-sm font-medium text-slate-800 break-words cursor-pointer ${todo.completed ? 'completed-item text-slate-400' : ''}" onclick="toggleTodo(${todo.id})">
+                                    ${escapeHtml(todo.text)}
+                                </span>
+                                
+                                <!-- Meta Badges -->
+                                <div class="flex items-center flex-wrap gap-2 mt-1.5">
+                                    ${getCategoryBadgeHtml(todo.category)}
+                                    ${getPriorityBadgeHtml(todo.priority)}
+                                    ${todo.dueDate ? `
+                                        <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                                            <i class="fa-regular fa-clock"></i> ${todo.dueDate}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Action Buttons -->
+                        <div class="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="promptEdit(${todo.id}, '${escapeHtml(todo.text)}')" class="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors" title="編輯事項">
+                                <i class="fa-regular fa-pen-to-square text-sm"></i>
+                            </button>
+                            <button onclick="deleteTodo(${todo.id})" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="刪除事項">
+                                <i class="fa-regular fa-trash-can text-sm"></i>
+                            </button>
+                        </div>
+                    </li>
+                `).join('');
+            }
+        }
+
+        // Helper to escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Prompt for Editing Todo
+        function promptEdit(id, oldText) {
+            const newText = prompt('編輯待辦事項：', oldText);
+            if (newText !== null) {
+                editTodo(id, newText);
+            }
+        }
+
+        // Event Listeners Initialization
+        function initEventListeners() {
+            // Form Submit Event
+            todoForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = todoInput.value;
+                const category = categorySelect.value;
+                const priority = prioritySelect.value;
+                const dueDate = dueDateInput.value;
+
+                if (text) {
+                    addTodo(text, category, priority, dueDate);
+                    todoInput.value = '';
+                    dueDateInput.value = '';
+                    todoInput.focus();
+                }
+            });
+
+            // Filter Tabs Click
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => {
+                        b.classList.remove('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
+                        b.classList.add('text-slate-600');
+                    });
+                    btn.classList.add('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
+                    btn.classList.remove('text-slate-600');
+
+                    currentFilter = btn.dataset.filter;
+                    renderTodos();
+                });
+            });
+
+            // Set Active Tab Initial Style
+            document.querySelector('.filter-btn[data-filter="all"]').classList.add('bg-white', 'shadow-sm', 'text-emerald-700', 'font-semibold');
+
+            // Search Input Event
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                renderTodos();
+            });
+
+            // Clear Completed Event
+            clearCompletedBtn.addEventListener('click', () => {
+                const completedCount = todos.filter(t => t.completed).length;
+                if (completedCount === 0) return;
+                clearCompleted();
+            });
+        }
+
+        // App Initializer
+        window.onload = function() {
+            loadTodos();
+            initEventListeners();
+            renderTodos();
+        };
+    </script>
+</body>
+</html>
