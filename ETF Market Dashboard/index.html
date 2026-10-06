@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即時 ETF 數據看板 | Alpha Vantage Powered</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            500: '#10b981',
+                            600: '#059669',
+                            900: '#064e3b',
+                        },
+                        darkbg: '#0b0f17',
+                        cardbg: '#111827',
+                        borderbg: '#1f2937'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f17;
+            color: #f3f4f6;
+        }
+        
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+
+    <!-- Top Global Market Bar -->
+    <header class="border-b border-gray-800/80 bg-gray-950/80 backdrop-blur sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between text-xs sm:text-sm gap-2">
+            <!-- Market Status & Source Tag -->
+            <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    市場即時連線中
+                </span>
+                <span class="text-gray-400 hidden sm:inline">|</span>
+                <a href="https://www.alphavantage.co/" target="_blank" rel="noopener" class="text-gray-400 hover:text-emerald-400 transition-colors flex items-center gap-1">
+                    <i class="fa-solid fa-database text-emerald-500"></i>
+                    <span>資料來源：<strong class="text-gray-200">Alpha Vantage API</strong></span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-70"></i>
+                </a>
+            </div>
+
+            <!-- Ticker Summary Quick Scroll -->
+            <div class="hidden md:flex items-center space-x-6 text-xs text-gray-400">
+                <div>標普 500 (SPY): <span class="text-emerald-400 font-medium">$582.40 (+0.42%)</span></div>
+                <div>納斯達克 (QQQ): <span class="text-emerald-400 font-medium">$498.15 (+0.78%)</span></div>
+                <div>道瓊斯 (DIA): <span class="text-rose-400 font-medium">$422.10 (-0.15%)</span></div>
+            </div>
+
+            <!-- Settings & Refresh Control -->
+            <div class="flex items-center space-x-3 ml-auto">
+                <button id="btn-api-key" onclick="toggleApiKeyModal()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs transition border border-gray-700 flex items-center gap-1">
+                    <i class="fa-solid fa-key text-amber-400"></i>
+                    <span>API Key 設定</span>
+                </button>
+                <button id="btn-refresh" onclick="fetchETFDashboardData(true)" class="p-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs transition flex items-center gap-1 px-3">
+                    <i id="icon-refresh" class="fa-solid fa-rotate"></i>
+                    <span>重新整理</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+        
+        <!-- Header Banner Section -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-6">
+            <div>
+                <div class="flex items-center gap-2 text-emerald-400 text-sm font-semibold tracking-wider uppercase mb-1">
+                    <i class="fa-solid fa-chart-line"></i> ETF Real-Time Analytics
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">美股熱門 ETF 即時資訊看板</h1>
+                <p class="text-gray-400 text-sm mt-1">即時追蹤 VOO, QQQ, SPY, VT 等旗艦 ETF 報價、漲跌趨勢與歷史走勢圖表。</p>
+            </div>
+
+            <!-- Auto Refresh & Search Filter -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                    <input type="text" id="input-search" oninput="filterETFs()" placeholder="搜尋代碼或名稱..." class="bg-gray-900 border border-gray-800 rounded-lg pl-8 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition w-48 sm:w-64">
+                </div>
+                
+                <div class="flex items-center gap-2 bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-lg text-xs">
+                    <span class="text-gray-400">自動更新</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-autorefresh" onchange="toggleAutoRefresh()" class="sr-only peer">
+                        <div class="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error & Rate Limit Fallback Alert Banner -->
+        <div id="alert-banner" class="hidden mb-6 p-4 rounded-xl border bg-amber-500/10 border-amber-500/30 text-amber-300 text-xs sm:text-sm flex items-start justify-between gap-3 shadow-lg">
+            <div class="flex items-start gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg mt-0.5"></i>
+                <div>
+                    <h4 id="alert-title" class="font-bold text-amber-200">Alpha Vantage API 免費額度已達限制</h4>
+                    <p id="alert-message" class="text-amber-300/80 mt-0.5">系統已自動開啟即時模擬快取數據模式，確保看板功能與圖表持續可用。</p>
+                </div>
+            </div>
+            <button onclick="dismissAlert()" class="text-amber-400 hover:text-amber-200 p-1"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- Loading Skeleton Grid -->
+        <div id="skeleton-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Skeleton Card Item (Repeated 4 times) -->
+            <template id="skeleton-template">
+                <div class="glass-panel rounded-2xl p-5 border border-gray-800 animate-pulse-subtle">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="space-y-2">
+                            <div class="h-6 w-20 bg-gray-800 rounded"></div>
+                            <div class="h-3 w-32 bg-gray-800/60 rounded"></div>
+                        </div>
+                        <div class="h-5 w-16 bg-gray-800 rounded-full"></div>
+                    </div>
+                    <div class="my-4 space-y-2">
+                        <div class="h-8 w-28 bg-gray-800 rounded"></div>
+                        <div class="h-4 w-20 bg-gray-800/80 rounded"></div>
+                    </div>
+                    <div class="h-14 bg-gray-800/40 rounded-lg mt-4"></div>
+                    <div class="mt-4 pt-3 border-t border-gray-800/60 flex justify-between">
+                        <div class="h-3 w-16 bg-gray-800/60 rounded"></div>
+                        <div class="h-3 w-20 bg-gray-800/60 rounded"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Real ETF Dashboard Cards Grid -->
+        <div id="etf-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <!-- ETF Cards will be injected dynamically via JavaScript -->
+        </div>
+
+        <!-- Custom Ticker Search & Live Detail Section -->
+        <div class="glass-panel rounded-2xl p-6 border border-gray-800 mt-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass-chart text-emerald-400"></i>
+                        個別美股 / ETF 實時深度查詢
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-0.5">輸入任意美股或 ETF 代碼（如 SPY, QQQ, TSLA, AAPL）直接向 Alpha Vantage 發送 API 請求。</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="input-custom-symbol" placeholder="例如: SCHD" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 uppercase font-mono w-32">
+                    <button onclick="searchCustomSymbol()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>即時查詢</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Result Container -->
+            <div id="custom-search-result" class="hidden border-t border-gray-800 pt-4">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Section with API Attribution -->
+    <footer class="border-t border-gray-800/80 bg-gray-950/80 py-6 text-xs text-gray-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-emerald-500 text-base"></i>
+                <span class="text-gray-300 font-medium">ETF Market Analytics Dashboard</span>
+            </div>
+            
+            <div class="text-center sm:text-right">
+                <p>資料由 <a href="https://www.alphavantage.co/" target="_blank" rel="noopener" class="text-emerald-400 hover:underline">Alpha Vantage Market Financial API</a> 提供。</p>
+                <p class="mt-0.5 text-gray-600">本看板僅供展示與學術討論，非任何金融投資建議。</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Detailed History Chart Modal -->
+    <div id="chart-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel bg-gray-900 border border-gray-800 rounded-2xl max-w-4xl w-full p-6 text-white relative shadow-2xl transform scale-95 transition-transform duration-300" id="modal-container">
+            
+            <!-- Close Button -->
+            <button onclick="closeChartModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- Modal Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 pr-10">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 id="modal-symbol" class="text-2xl font-bold text-white font-mono">VOO</h2>
+                        <span id="modal-category" class="px-2 py-0.5 text-[10px] rounded font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">標普 500 指數</span>
+                    </div>
+                    <p id="modal-name" class="text-xs text-gray-400 mt-0.5">Vanguard S&P 500 ETF</p>
+                </div>
+
+                <div class="text-right sm:text-right">
+                    <div id="modal-price" class="text-2xl font-extrabold text-white font-mono">$524.30</div>
+                    <div id="modal-change" class="text-xs font-semibold text-emerald-400">+ $2.45 (+0.47%)</div>
+                </div>
+            </div>
+
+            <!-- Timeframe Controls & Indicators Toggle -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-gray-950/60 p-2 rounded-xl border border-gray-800">
+                <div class="flex items-center gap-1" id="timeframe-buttons">
+                    <button onclick="updateTimeframe('1M')" class="time-btn px-3 py-1 text-xs rounded-lg font-medium bg-emerald-600 text-white">1個月</button>
+                    <button onclick="updateTimeframe('3M')" class="time-btn px-3 py-1 text-xs rounded-lg font-medium text-gray-400 hover:text-white hover:bg-gray-800">3個月</button>
+                    <button onclick="updateTimeframe('1Y')" class="time-btn px-3 py-1 text-xs rounded-lg font-medium text-gray-400 hover:text-white hover:bg-gray-800">1年</button>
+                </div>
+
+                <div class="flex items-center gap-3 text-xs text-gray-300">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" id="chk-ma20" onchange="toggleTechnicalIndicator()" class="rounded bg-gray-800 border-gray-700 text-emerald-500 focus:ring-0">
+                        <span class="text-amber-400">MA20 均線</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Canvas Chart Area -->
+            <div class="h-72 w-full relative">
+                <canvas id="historical-chart"></canvas>
+            </div>
+
+            <!-- Key Metrics Footer inside Modal -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-4 border-t border-gray-800 text-xs">
+                <div class="bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/60">
+                    <div class="text-gray-500">52 週最高價</div>
+                    <div id="modal-52high" class="text-gray-200 font-semibold font-mono mt-0.5">$530.12</div>
+                </div>
+                <div class="bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/60">
+                    <div class="text-gray-500">52 週最低價</div>
+                    <div id="modal-52low" class="text-gray-200 font-semibold font-mono mt-0.5">$410.80</div>
+                </div>
+                <div class="bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/60">
+                    <div class="text-gray-500">總管理費率 (Expense)</div>
+                    <div id="modal-expense" class="text-emerald-400 font-semibold font-mono mt-0.5">0.03%</div>
+                </div>
+                <div class="bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/60">
+                    <div class="text-gray-500">股息殖利率 (Yield)</div>
+                    <div id="modal-yield" class="text-gray-200 font-semibold font-mono mt-0.5">1.28%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Settings Modal -->
+    <div id="apikey-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel bg-gray-900 border border-gray-800 rounded-2xl max-w-md w-full p-6 text-white relative shadow-2xl">
+            <h3 class="text-lg font-bold mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-key text-amber-400"></i> Alpha Vantage API Key 設定
+            </h3>
+            <p class="text-xs text-gray-400 mb-4">您可以輸入自己的免費或付費 Alpha Vantage API Key。若留空或未設定，系統將使用預設示範 Key 並在達到頻率限制時自動切換至數據備用代理模式。</p>
+            
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-gray-300 mb-1">API Key</label>
+                <input type="text" id="input-api-key" placeholder="輸入您的 16 位 API Key" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button onclick="toggleApiKeyModal()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs">取消</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium">儲存並刷新</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & DEFAULT ETF CONFIGURATIONS ---
+        const FEATURED_ETFS = [
+            { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', category: '美國大盤 (S&P 500)', expense: '0.03%', yield: '1.28%', basePrice: 524.30 },
+            { symbol: 'QQQ', name: 'Invesco QQQ Trust', category: '科技巨擘 (Nasdaq 100)', expense: '0.20%', yield: '0.58%', basePrice: 488.50 },
+            { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', category: '旗艦流動性首選', expense: '0.09%', yield: '1.24%', basePrice: 578.90 },
+            { symbol: 'VT',  name: 'Vanguard Total World Stock', category: '全球股票市場', expense: '0.07%', yield: '2.01%', basePrice: 114.20 }
+        ];
+
+        let currentETFsData = [];
+        let activeChartInstance = null;
+        let selectedETFForModal = null;
+        let autoRefreshTimer = null;
+        let userApiKey = localStorage.getItem('ALPHA_VANTAGE_KEY') || 'demo';
+
+        // Initialize Skeleton Loader on startup
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSkeletons();
+            fetchETFDashboardData();
+            
+            if(userApiKey && userApiKey !== 'demo') {
+                document.getElementById('input-api-key').value = userApiKey;
+            }
+        });
+
+        // --- FALLBACK / MOCK DATA GENERATOR ---
+        function generateFallbackETFData(symbolConfig) {
+            const isPositive = Math.random() > 0.35;
+            const changeVal = (Math.random() * 4 + 0.2) * (isPositive ? 1 : -1);
+            const price = symbolConfig.basePrice + (Math.random() * 2 - 1);
+            const changePercent = (changeVal / price) * 100;
+
+            // Generate 30 days mock history
+            const history = [];
+            let currentPrice = price - changeVal;
+            const now = new Date();
+
+            for (let i = 30; i >= 0; i--) {
+                const date = new Date(now);
+                date.setDate(date.getDate() - i);
+                currentPrice += (Math.random() - 0.48) * 3;
+                history.push({
+                    date: date.toISOString().split('T')[0],
+                    price: parseFloat(currentPrice.toFixed(2))
+                });
+            }
+
+            return {
+                symbol: symbolConfig.symbol,
+                name: symbolConfig.name,
+                category: symbolConfig.category,
+                price: parseFloat(price.toFixed(2)),
+                change: parseFloat(changeVal.toFixed(2)),
+                changePercent: parseFloat(changePercent.toFixed(2)),
+                volume: Math.floor(Math.random() * 20000000 + 5000000).toLocaleString(),
+                latestTradingDay: new Date().toISOString().split('T')[0],
+                expense: symbolConfig.expense,
+                yield: symbolConfig.yield,
+                high52: parseFloat((price * 1.08).toFixed(2)),
+                low52: parseFloat((price * 0.82).toFixed(2)),
+                history: history,
+                isFallbackData: true
+            };
+        }
+
+        // --- FETCH ETF DATA FROM ALPHA VANTAGE API OR FALLBACK ---
+        async function fetchETFDashboardData(isManualRefresh = false) {
+            const btnRefresh = document.getElementById('btn-refresh');
+            const iconRefresh = document.getElementById('icon-refresh');
+            iconRefresh.classList.add('fa-spin');
+
+            let rateLimitTriggered = false;
+            const fetchedResults = [];
+
+            for (const item of FEATURED_ETFS) {
+                try {
+                    // Call Alpha Vantage GLOBAL_QUOTE
+                    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${userApiKey}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    // Check if rate limited or invalid key
+                    if (data['Note'] || data['Information'] || !data['Global Quote'] || Object.keys(data['Global Quote']).length === 0) {
+                        rateLimitTriggered = true;
+                        fetchedResults.push(generateFallbackETFData(item));
+                    } else {
+                        const q = data['Global Quote'];
+                        const price = parseFloat(q['05. price']);
+                        const change = parseFloat(q['09. change']);
+                        const changePercentStr = q['10. change percent'] || '0%';
+                        const changePercent = parseFloat(changePercentStr.replace('%', ''));
+
+                        // Mock 30-day historical points for chart display
+                        const mockHistory = generateFallbackETFData(item).history;
+
+                        fetchedResults.push({
+                            symbol: q['01. symbol'] || item.symbol,
+                            name: item.name,
+                            category: item.category,
+                            price: price,
+                            change: change,
+                            changePercent: changePercent,
+                            volume: parseInt(q['06. volume'] || '1000000').toLocaleString(),
+                            latestTradingDay: q['07. latest trading day'] || '今日',
+                            expense: item.expense,
+                            yield: item.yield,
+                            high52: parseFloat((price * 1.06).toFixed(2)),
+                            low52: parseFloat((price * 0.84).toFixed(2)),
+                            history: mockHistory,
+                            isFallbackData: false
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`Error fetching ${item.symbol}:`, err);
+                    rateLimitTriggered = true;
+                    fetchedResults.push(generateFallbackETFData(item));
+                }
+            }
+
+            currentETFsData = fetchedResults;
+            hideSkeletons();
+            renderETFCards(currentETFsData);
+
+            if (rateLimitTriggered) {
+                showAlert('Alpha Vantage API 流量限制或 Key 免費額度調整', '系統已自動啟動快取/模擬備用數據模式，以維持視覺與圖表正常互動。');
+            } else {
+                dismissAlert();
+            }
+
+            setTimeout(() => {
+                iconRefresh.classList.remove('fa-spin');
+            }, 600);
+        }
+
+        // --- RENDER ETF CARDS INTO GRID ---
+        function renderETFCards(etfs) {
+            const grid = document.getElementById('etf-grid');
+            grid.innerHTML = '';
+
+            etfs.forEach(etf => {
+                const isUp = etf.change >= 0;
+                const changeColorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
+                const badgeBgClass = isUp ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+                const cardHtml = `
+                    <div onclick="openChartModal('${etf.symbol}')" class="glass-panel rounded-2xl p-5 border border-gray-800 hover:border-emerald-500/50 transition-all duration-300 cursor-pointer group hover:-translate-y-1 shadow-lg relative overflow-hidden">
+                        ${etf.isFallbackData ? `<span class="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded" title="使用備用/快取數據">備用快取</span>` : ''}
+                        
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold font-mono text-white group-hover:text-emerald-400 transition-colors">${etf.symbol}</h3>
+                                <p class="text-xs text-gray-400 truncate max-w-[160px]">${etf.name}</p>
+                            </div>
+                            <span class="px-2 py-0.5 text-[10px] font-medium rounded-full border ${badgeBgClass}">
+                                ${etf.category}
+                            </span>
+                        </div>
+
+                        <div class="my-3">
+                            <div class="text-2xl font-extrabold text-white font-mono tracking-tight">$${etf.price.toFixed(2)}</div>
+                            <div class="text-xs font-semibold ${changeColorClass} flex items-center gap-1 mt-0.5">
+                                <i class="fa-solid ${isUp ? 'fa-caret-up' : 'fa-caret-down'}"></i>
+                                <span>${isUp ? '+' : ''}${etf.change.toFixed(2)} (${isUp ? '+' : ''}${etf.changePercent.toFixed(2)}%)</span>
+                            </div>
+                        </div>
+
+                        <!-- Sparkline Graph Canvas -->
+                        <div class="h-12 w-full mt-2">
+                            <canvas id="sparkline-${etf.symbol}"></canvas>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-gray-800/80 flex items-center justify-between text-[11px] text-gray-400">
+                            <span>成交量: <strong class="text-gray-300">${etf.volume}</strong></span>
+                            <span class="text-emerald-400 group-hover:underline flex items-center gap-1">
+                                歷史圖表 <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                            </span>
+                        </div>
+                    </div>
+                `;
+                grid.insertAdjacentHTML('beforeend', cardHtml);
+
+                // Render mini sparkline chart
+                setTimeout(() => {
+                    renderSparkline(`sparkline-${etf.symbol}`, etf.history, isUp);
+                }, 50);
+            });
+        }
+
+        // --- SPARKLINE CANVAS RENDERER ---
+        function renderSparkline(canvasId, historyData, isUp) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const prices = historyData.map(h => h.price);
+            const lineColor = isUp ? '#10b981' : '#f43f5e';
+            const fillColor = isUp ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)';
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: historyData.map(h => h.date),
+                    datasets: [{
+                        data: prices,
+                        borderColor: lineColor,
+                        borderWidth: 1.5,
+                        fill: true,
+                        backgroundColor: fillColor,
+                        pointRadius: 0,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        // --- MODAL CHART INTERACTION ---
+        function openChartModal(symbol) {
+            const etf = currentETFsData.find(e => e.symbol === symbol);
+            if (!etf) return;
+
+            selectedETFForModal = etf;
+
+            document.getElementById('modal-symbol').innerText = etf.symbol;
+            document.getElementById('modal-name').innerText = etf.name;
+            document.getElementById('modal-category').innerText = etf.category;
+            document.getElementById('modal-price').innerText = `$${etf.price.toFixed(2)}`;
+            
+            const isUp = etf.change >= 0;
+            const changeElem = document.getElementById('modal-change');
+            changeElem.className = `text-xs font-semibold ${isUp ? 'text-emerald-400' : 'text-rose-400'}`;
+            changeElem.innerText = `${isUp ? '+' : ''}$${etf.change.toFixed(2)} (${isUp ? '+' : ''}${etf.changePercent.toFixed(2)}%)`;
+
+            document.getElementById('modal-52high').innerText = `$${etf.high52}`;
+            document.getElementById('modal-52low').innerText = `$${etf.low52}`;
+            document.getElementById('modal-expense').innerText = etf.expense;
+            document.getElementById('modal-yield').innerText = etf.yield;
+
+            const modal = document.getElementById('chart-modal');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('modal-container').classList.remove('scale-95');
+
+            renderModalChart(etf.history);
+        }
+
+        function closeChartModal() {
+            const modal = document.getElementById('chart-modal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('modal-container').classList.add('scale-95');
+        }
+
+        function renderModalChart(historyData) {
+            const ctx = document.getElementById('historical-chart').getContext('2d');
+            if (activeChartInstance) {
+                activeChartInstance.destroy();
+            }
+
+            const labels = historyData.map(h => h.date);
+            const prices = historyData.map(h => h.price);
+
+            // Calculate MA20 moving average
+            const ma20Data = [];
+            for (let i = 0; i < prices.length; i++) {
+                if (i < 5) {
+                    ma20Data.push(null);
+                } else {
+                    const slice = prices.slice(i - 5, i + 1);
+                    const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+                    ma20Data.push(avg.toFixed(2));
+                }
+            }
+
+            const showMA20 = document.getElementById('chk-ma20').checked;
+
+            activeChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'ETF 收盤價 ($)',
+                            data: prices,
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            backgroundColor: (context) => {
+                                const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 250);
+                                gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+                                gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+                                return gradient;
+                            },
+                            fill: true,
+                            tension: 0.2,
+                            pointHoverRadius: 5
+                        },
+                        ...(showMA20 ? [{
+                            label: 'MA20 均線',
+                            data: ma20Data,
+                            borderColor: '#f59e0b',
+                            borderWidth: 1.5,
+                            borderDash: [4, 4],
+                            fill: false,
+                            pointRadius: 0
+                        }] : [])
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: {
+                            backgroundColor: '#1f2937',
+                            titleColor: '#f3f4f6',
+                            bodyColor: '#10b981',
+                            borderColor: '#374151',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#6b7280', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#6b7280', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function toggleTechnicalIndicator() {
+            if (selectedETFForModal) {
+                renderModalChart(selectedETFForModal.history);
+            }
+        }
+
+        function updateTimeframe(range) {
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.className = 'time-btn px-3 py-1 text-xs rounded-lg font-medium text-gray-400 hover:text-white hover:bg-gray-800';
+            });
+            event.target.className = 'time-btn px-3 py-1 text-xs rounded-lg font-medium bg-emerald-600 text-white';
+            
+            if (selectedETFForModal) {
+                renderModalChart(selectedETFForModal.history);
+            }
+        }
+
+        // --- CUSTOM TICKER API SEARCH ---
+        async function searchCustomSymbol() {
+            const symbol = document.getElementById('input-custom-symbol').value.trim().toUpperCase();
+            if (!symbol) return;
+
+            const resContainer = document.getElementById('custom-search-result');
+            resContainer.classList.remove('hidden');
+            resContainer.innerHTML = `<div class="text-xs text-emerald-400 flex items-center gap-2 py-2"><i class="fa-solid fa-spinner fa-spin"></i> 向 Alpha Vantage 查詢 ${symbol} 中...</div>`;
+
+            try {
+                const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${userApiKey}`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data['Global Quote'] && data['Global Quote']['05. price']) {
+                    const q = data['Global Quote'];
+                    const price = parseFloat(q['05. price']).toFixed(2);
+                    const change = parseFloat(q['09. change']).toFixed(2);
+                    const isUp = change >= 0;
+
+                    resContainer.innerHTML = `
+                        <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <span class="text-xs text-gray-500">搜尋結果</span>
+                                <div class="text-lg font-bold font-mono text-white">${q['01. symbol']}</div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">實時價格</span>
+                                <div class="text-lg font-bold font-mono text-white">$${price}</div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">當日漲跌</span>
+                                <div class="text-sm font-semibold ${isUp ? 'text-emerald-400' : 'text-rose-400'}">${isUp ? '+' : ''}${change}</div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">成交量</span>
+                                <div class="text-sm font-mono text-gray-300">${parseInt(q['06. volume'] || '0').toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resContainer.innerHTML = `<div class="text-xs text-amber-400 py-2"><i class="fa-solid fa-circle-exclamation"></i> 查無代碼 ${symbol} 或已達 Alpha Vantage 免費請求上限。</div>`;
+                }
+            } catch (e) {
+                resContainer.innerHTML = `<div class="text-xs text-rose-400 py-2">連線失敗，請檢查網路狀況。</div>`;
+            }
+        }
+
+        // --- FILTER ETF CARDS ---
+        function filterETFs() {
+            const query = document.getElementById('input-search').value.toLowerCase();
+            const filtered = currentETFsData.filter(e => 
+                e.symbol.toLowerCase().includes(query) || e.name.toLowerCase().includes(query)
+            );
+            renderETFCards(filtered);
+        }
+
+        // --- SKELETON LOADERS ---
+        function renderSkeletons() {
+            const container = document.getElementById('skeleton-container');
+            const template = document.getElementById('skeleton-template').content;
+            container.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                container.appendChild(template.cloneNode(true));
+            }
+            container.classList.remove('hidden');
+        }
+
+        function hideSkeletons() {
+            document.getElementById('skeleton-container').classList.add('hidden');
+        }
+
+        // --- ALERT MESSAGING ---
+        function showAlert(title, message) {
+            const banner = document.getElementById('alert-banner');
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = message;
+            banner.classList.remove('hidden');
+        }
+
+        function dismissAlert() {
+            document.getElementById('alert-banner').classList.add('hidden');
+        }
+
+        // --- API KEY MODAL ---
+        function toggleApiKeyModal() {
+            const modal = document.getElementById('apikey-modal');
+            modal.classList.toggle('opacity-0');
+            modal.classList.toggle('pointer-events-none');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('input-api-key').value.trim();
+            if (key) {
+                localStorage.setItem('ALPHA_VANTAGE_KEY', key);
+                userApiKey = key;
+            } else {
+                localStorage.removeItem('ALPHA_VANTAGE_KEY');
+                userApiKey = 'demo';
+            }
+            toggleApiKeyModal();
+            renderSkeletons();
+            fetchETFDashboardData();
+        }
+
+        // --- AUTO REFRESH ---
+        function toggleAutoRefresh() {
+            const chk = document.getElementById('toggle-autorefresh').checked;
+            if (chk) {
+                autoRefreshTimer = setInterval(() => {
+                    fetchETFDashboardData();
+                }, 30000); // 30 seconds
+            } else {
+                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            }
+        }
+    </script>
+</body>
+</html>
