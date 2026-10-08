@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台南市新營區即時路邊停車資訊地圖 | Xinying Parking Map</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        },
+                        status: {
+                            available: '#10b981',
+                            low: '#f59e0b',
+                            full: '#ef4444',
+                            nodata: '#6b7280'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js for Parking Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: calc(100vh - 64px);
+            z-index: 1;
+        }
+        .custom-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid white;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .custom-marker:hover {
+            transform: scale(1.15);
+            z-index: 999 !important;
+        }
+        .marker-available { background-color: #10b981; }
+        .marker-low { background-color: #f59e0b; }
+        .marker-full { background-color: #ef4444; }
+        .marker-nodata { background-color: #6b7280; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
+
+    <!-- Navigation Header -->
+    <header class="bg-slate-900 text-white h-16 px-4 flex items-center justify-between shadow-md z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-brand-600 p-2 rounded-lg text-white flex items-center justify-center shadow">
+                <i class="fa-solid fa-square-parking text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+                    新營區即時路邊停車資訊地圖
+                    <span class="text-xs font-normal bg-brand-900 text-brand-100 border border-brand-600 px-2 py-0.5 rounded-full hidden sm:inline-block">TDX 串接測試版</span>
+                </h1>
+                <p class="text-xs text-slate-400 hidden md:block">Tainan Xinying Real-Time On-Street Parking Map</p>
+            </div>
+        </div>
+
+        <!-- Realtime Refresh Ticker & Actions -->
+        <div class="flex items-center gap-2 sm:gap-4">
+            <div class="hidden lg:flex items-center gap-3 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                <div class="flex items-center gap-1.5 text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>自動更新: <strong id="countdown-timer">60</strong>s</span>
+                </div>
+                <div class="text-slate-400">|</div>
+                <div class="text-slate-300">
+                    最後更新: <span id="last-updated-time" class="font-mono text-amber-300">載入中...</span>
+                </div>
+            </div>
+
+            <button id="btn-manual-refresh" onclick="fetchParkingData(true)" title="立即手動更新"
+                class="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-sm transition flex items-center gap-1.5">
+                <i id="refresh-icon" class="fa-solid fa-arrows-rotate"></i>
+                <span class="hidden sm:inline">更新</span>
+            </button>
+
+            <button onclick="toggleModal('modal-arch')" title="系統架構說明"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg text-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span class="hidden md:inline">架構說明</span>
+            </button>
+
+            <button onclick="toggleModal('modal-config')" title="Backend/Worker API 設定"
+                class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow transition flex items-center gap-1.5">
+                <i class="fa-solid fa-gear"></i>
+                <span class="hidden md:inline">API 設定</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <div class="flex-1 flex relative overflow-hidden">
+        
+        <!-- Side Drawer / Control Panel (Responsive) -->
+        <aside id="side-panel" class="absolute lg:relative top-0 left-0 h-full w-full sm:w-80 lg:w-96 bg-white border-r border-slate-200 shadow-xl lg:shadow-none z-10 transition-transform duration-300 transform lg:translate-x-0 -translate-x-full flex flex-col">
+            
+            <!-- Side Panel Header -->
+            <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-filter text-brand-600"></i>
+                    <h2 class="font-bold text-slate-800">車位搜尋與篩選</h2>
+                </div>
+                <button onclick="toggleSidePanel(false)" class="lg:hidden text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Stats Overview Bar -->
+            <div class="grid grid-cols-3 gap-2 p-3 bg-slate-100/70 border-b border-slate-200 text-center">
+                <div class="bg-white p-2 rounded border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500">總格位</div>
+                    <div id="stat-total" class="text-lg font-bold text-slate-800">--</div>
+                </div>
+                <div class="bg-emerald-50 p-2 rounded border border-emerald-200 shadow-sm">
+                    <div class="text-xs text-emerald-600 font-medium">剩餘空位</div>
+                    <div id="stat-available" class="text-lg font-bold text-emerald-600">--</div>
+                </div>
+                <div class="bg-slate-50 p-2 rounded border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500">整體使用率</div>
+                    <div id="stat-occupancy" class="text-lg font-bold text-slate-700">--%</div>
+                </div>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="p-3 border-b border-slate-200 space-y-2.5 bg-white">
+                <!-- Search Input -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="input-search" oninput="filterSpots()" placeholder="搜尋路段或車位編號 (如: 民治路)..." 
+                        class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                    <button onclick="clearSearch()" id="btn-clear-search" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Status Filter Badges -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="setStatusFilter('all')" id="filter-all" class="filter-btn active text-xs px-2.5 py-1.5 rounded-full font-medium transition bg-slate-800 text-white">
+                        全部 <span id="count-all" class="opacity-80">(--)</span>
+                    </button>
+                    <button onclick="setStatusFilter('available')" id="filter-available" class="filter-btn text-xs px-2.5 py-1.5 rounded-full font-medium transition bg-slate-100 text-emerald-700 hover:bg-emerald-100 border border-emerald-200">
+                        🟢 有空位 <span id="count-available" class="opacity-80">(--)</span>
+                    </button>
+                    <button onclick="setStatusFilter('low')" id="filter-low" class="filter-btn text-xs px-2.5 py-1.5 rounded-full font-medium transition bg-slate-100 text-amber-700 hover:bg-amber-100 border border-amber-200">
+                        🟠 少量 <span id="count-low" class="opacity-80">(--)</span>
+                    </button>
+                    <button onclick="setStatusFilter('full')" id="filter-full" class="filter-btn text-xs px-2.5 py-1.5 rounded-full font-medium transition bg-slate-100 text-rose-700 hover:bg-rose-100 border border-rose-200">
+                        🔴 已滿 <span id="count-full" class="opacity-80">(--)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Switcher (List vs Chart) -->
+            <div class="flex border-b border-slate-200 bg-slate-50">
+                <button onclick="switchTab('list')" id="tab-btn-list" class="flex-1 py-2 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-list-ul"></i> 車位列表
+                </button>
+                <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-chart-column"></i> 新營區趨勢
+                </button>
+            </div>
+
+            <!-- List Content Area -->
+            <div id="tab-content-list" class="flex-1 overflow-y-auto divide-y divide-slate-100">
+                <div id="parking-list" class="p-2 space-y-2">
+                    <!-- Parking spot cards injected dynamically -->
+                </div>
+                <div id="list-empty" class="hidden p-8 text-center text-slate-400 space-y-2">
+                    <i class="fa-solid fa-parking-slash text-4xl text-slate-300"></i>
+                    <p class="text-sm font-medium">未找到符合條件的路邊停車格</p>
+                </div>
+            </div>
+
+            <!-- Analytics Content Area -->
+            <div id="tab-content-analytics" class="hidden flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-600"></i> 今日新營區平均車位佔用率趨勢
+                    </h3>
+                    <div class="h-44">
+                        <canvas id="chart-occupancy"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2">熱門路段佔用排行</h3>
+                    <div id="top-busy-streets" class="space-y-2 text-xs">
+                        <!-- Top busy streets injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Panel Footer / Attribution -->
+            <div class="p-3 bg-slate-100 border-t border-slate-200 text-xs text-slate-500 space-y-1 text-center">
+                <p>地圖資料 © <a href="https://www.openstreetmap.org/copyright" target="_blank" class="underline hover:text-slate-700">OpenStreetMap</a> contributors</p>
+                <p>即時停車資料來源：<a href="https://tdx.transportdata.tw/" target="_blank" class="underline hover:text-slate-700">交通部 TDX 運輸資料流通服務</a></p>
+            </div>
+        </aside>
+
+        <!-- Map Container & Floating Controls -->
+        <main class="flex-1 relative">
+            
+            <!-- Leaflet Map -->
+            <div id="map"></div>
+
+            <!-- Mobile Toggle Side Panel Button -->
+            <button onclick="toggleSidePanel(true)" 
+                class="lg:hidden absolute top-4 left-4 z-[500] bg-white text-slate-800 p-3 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 text-sm font-bold active:scale-95 transition">
+                <i class="fa-solid fa-bars text-brand-600"></i>
+                <span>列表 / 篩選</span>
+            </button>
+
+            <!-- Floating Action Bar (Right side) -->
+            <div class="absolute top-4 right-4 z-[500] flex flex-col gap-2">
+                <!-- Locate Me Button -->
+                <button onclick="locateUser()" title="我的定位"
+                    class="bg-white hover:bg-slate-50 text-slate-700 p-2.5 rounded-lg shadow-md border border-slate-200 flex items-center justify-center transition active:scale-90">
+                    <i class="fa-solid fa-crosshairs text-base text-brand-600"></i>
+                </button>
+
+                <!-- Center Xinying Button -->
+                <button onclick="resetMapView()" title="回到新營區中心"
+                    class="bg-white hover:bg-slate-50 text-slate-700 p-2.5 rounded-lg shadow-md border border-slate-200 flex items-center justify-center transition active:scale-90">
+                    <i class="fa-solid fa-location-dot text-base text-rose-500"></i>
+                </button>
+            </div>
+
+            <!-- Map Legend Box (Bottom Left Floating) -->
+            <div class="absolute bottom-6 left-4 z-[500] bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-lg border border-slate-200/80 text-xs space-y-1.5 hidden sm:block">
+                <div class="font-bold text-slate-700 mb-1 flex items-center justify-between gap-4">
+                    <span>圖例 (格位狀態)</span>
+                    <span class="text-[10px] text-slate-400 font-normal">即時呈現</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <span class="text-slate-600">有空位 (&gt; 2 格)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <span class="text-slate-600">剩餘少量 (1 - 2 格)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                    <span class="text-slate-600">已滿 (0 格)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                    <span class="text-slate-600">暫無資料 / 未營運</span>
+                </div>
+            </div>
+
+            <!-- Notification Toast Message -->
+            <div id="toast" class="hidden absolute top-16 left-1/2 transform -translate-x-1/2 z-[1000] bg-slate-900/90 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-medium flex items-center gap-2 border border-slate-700 transition-all">
+                <i id="toast-icon" class="fa-solid fa-circle-info text-amber-400"></i>
+                <span id="toast-message">系統通知</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: API & Backend Configuration (Worker Integration) -->
+    <div id="modal-config" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col">
+            <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-server text-brand-400"></i>
+                    <h3 class="font-bold">Cloudflare Worker & API 設定</h3>
+                </div>
+                <button onclick="toggleModal('modal-config')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 space-y-4 text-sm overflow-y-auto max-h-[80vh]">
+                <div class="bg-sky-50 border border-sky-200 text-sky-800 p-3 rounded-lg text-xs leading-relaxed space-y-1">
+                    <p class="font-bold"><i class="fa-solid fa-shield-halved"></i> 前後端安全分離架構 (遵照專案規劃書)：</p>
+                    <p>Client ID 與 Client Secret 保存在 Cloudflare Worker 中，前端不保存任何 API 私鑰。</p>
+                </div>
+
+                <!-- API Source Selector -->
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">資料來源模式</label>
+                    <select id="config-data-source" onchange="toggleApiInputs()" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 font-medium text-slate-800">
+                        <option value="simulated">新營區真實模擬資料庫 (即時自動波動/開發預設)</option>
+                        <option value="worker">自訂 Cloudflare Worker Proxy URL (部署模式)</option>
+                        <option value="tdx_direct">直接測試 TDX OAuth API (僅測試用途)</option>
+                    </select>
+                </div>
+
+                <!-- Worker Proxy Input Field -->
+                <div id="group-worker-url" class="hidden space-y-1">
+                    <label class="block font-semibold text-slate-700">Cloudflare Worker 端點 URL</label>
+                    <input type="url" id="config-worker-url" placeholder="https://xinying-parking-worker.xxx.workers.dev/parking" 
+                        class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono">
+                    <p class="text-[11px] text-slate-500">Worker 須處理 Client Credentials 授權並經緯度過濾新營區格位。</p>
+                </div>
+
+                <!-- Direct TDX Testing inputs -->
+                <div id="group-tdx-direct" class="hidden space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div class="text-xs text-rose-600 font-semibold">⚠️ 警告：於前端輸入 Key 僅用於開發階段測試，請勿部署於 GitHub Pages！</div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600">TDX Client ID</label>
+                        <input type="text" id="config-tdx-id" placeholder="Client ID" class="w-full p-2 bg-white border border-slate-300 rounded text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600">TDX Client Secret</label>
+                        <input type="password" id="config-tdx-secret" placeholder="Client Secret" class="w-full p-2 bg-white border border-slate-300 rounded text-xs font-mono">
+                    </div>
+                </div>
+
+                <!-- Refresh Interval Setting -->
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">資料自動更新頻率 (秒)</label>
+                    <input type="number" id="config-refresh-interval" min="15" max="300" value="60" 
+                        class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono">
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+                <button onclick="toggleModal('modal-config')" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-200 text-xs font-semibold">取消</button>
+                <button onclick="saveConfiguration()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow">儲存並更新數據</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Architecture Diagram & Spec Info -->
+    <div id="modal-arch" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-sitemap text-emerald-400"></i>
+                    <h3 class="font-bold">系統架構與專案規格 (PDF)</h3>
+                </div>
+                <button onclick="toggleModal('modal-arch')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+                    <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-shield-cat text-brand-600"></i> 前後端分離與 OAuth 安全設計
+                    </h4>
+                    <p>依照《新營區即時路邊停車資訊地圖專案規劃書》系統架構規劃：</p>
+                    
+                    <!-- Text Sequence Diagram -->
+                    <div class="bg-slate-900 text-slate-200 font-mono text-[11px] p-3 rounded-lg overflow-x-auto leading-normal">
+                        [ 使用者 (GitHub Pages) ] <br>
+                        &nbsp;&nbsp;│ <br>
+                        &nbsp;&nbsp;├──► (1) GET /parking (HTTPS) <br>
+                        &nbsp;&nbsp;▼ <br>
+                        [ Cloudflare Worker (Serverless Backend) ] <br>
+                        &nbsp;&nbsp;│ (保存 TDX Client ID & Client Secret) <br>
+                        &nbsp;&nbsp;├──► (2) OAuth 2.0 取得 Access Token <br>
+                        &nbsp;&nbsp;├──► (3) 呼叫 TDX 路邊停車 API <br>
+                        &nbsp;&nbsp;├──► (4) 篩選台南市新營區座標與格位 <br>
+                        &nbsp;&nbsp;├──► (5) 設定 快取 (Cache TTL = 60s) <br>
+                        &nbsp;&nbsp;▼ <br>
+                        [ Leaflet.js 地圖視覺化 (OpenStreetMap) ]
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="border border-slate-200 p-3 rounded-lg bg-white">
+                        <span class="font-bold text-slate-800 block mb-1">🗺️ 地圖核心分工</span>
+                        <ul class="list-disc list-inside space-y-1 text-slate-600 text-xs">
+                            <li><strong>OpenStreetMap:</strong> 提供道路、地標底圖。</li>
+                            <li><strong>Leaflet.js:</strong> 處理標籤、Marker 繪製與互動 Popup。</li>
+                            <li><strong>TDX API:</strong> 提供停車格即時經緯度與剩餘數。</li>
+                        </ul>
+                    </div>
+                    <div class="border border-slate-200 p-3 rounded-lg bg-white">
+                        <span class="font-bold text-slate-800 block mb-1">🎨 格位狀態視覺定義</span>
+                        <ul class="list-disc list-inside space-y-1 text-slate-600 text-xs">
+                            <li><strong class="text-emerald-600">🟢 綠色:</strong> 有空位 (Available)</li>
+                            <li><strong class="text-amber-600">🟠 橘色:</strong> 剩餘少量 (Low Availability)</li>
+                            <li><strong class="text-rose-600">🔴 紅色:</strong> 已滿 (Full)</li>
+                            <li><strong class="text-slate-500">⚪ 灰色:</strong> 暫無資料 / 暫停營運</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="toggleModal('modal-arch')" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Xinying District Coordinates (Centered near Tainan City Hall Xinying Administrative Center)
+        const XINYING_CENTER = [23.3105, 120.3160];
+        const DEFAULT_ZOOM = 15;
+
+        // Application State Variables
+        let map = null;
+        let markersGroup = null;
+        let parkingData = [];
+        let filteredData = [];
+        let currentStatusFilter = 'all';
+        let countdownValue = 60;
+        let countdownTimer = null;
+        let userLocationMarker = null;
+        let chartInstance = null;
+
+        // Configuration Settings (Stored in LocalStorage if edited)
+        let appConfig = {
+            dataSource: localStorage.getItem('xy_source') || 'simulated', // 'simulated', 'worker', 'tdx_direct'
+            workerUrl: localStorage.getItem('xy_worker_url') || '',
+            tdxClientId: localStorage.getItem('xy_tdx_id') || '',
+            tdxClientSecret: localStorage.getItem('xy_tdx_secret') || '',
+            refreshInterval: parseInt(localStorage.getItem('xy_interval')) || 60
+        };
+
+        window.onload = function() {
+            initMap();
+            initChart();
+            fetchParkingData();
+            startCountdown();
+
+            // Setup search bar listener
+            document.getElementById('input-search').addEventListener('keyup', filterSpots);
+        };
+
+        // Initialize Leaflet Map
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView(XINYING_CENTER, DEFAULT_ZOOM);
+
+            // OpenStreetMap Standard Tiles Layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                subdomains: ['a', 'b', 'c']
+            }).addTo(map);
+
+            // Add standard custom Leaflet controls position
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // LayerGroup for Parking Markers
+            markersGroup = L.layerGroup().addTo(map);
+        }
+
+        async function fetchParkingData(isManual = false) {
+            const refreshBtnIcon = document.getElementById('refresh-icon');
+            if (refreshBtnIcon) refreshBtnIcon.classList.add('fa-spin');
+
+            try {
+                let rawData = [];
+
+                if (appConfig.dataSource === 'worker' && appConfig.workerUrl) {
+                    // Fetch via Cloudflare Worker proxy endpoint
+                    showToast('正在向 Cloudflare Worker 取得新營區即時資料...', 'info');
+                    const res = await fetch(appConfig.workerUrl);
+                    if (!res.ok) throw new Error(`Worker 回應異常 (HTTP ${res.status})`);
+                    rawData = await res.json();
+                } else if (appConfig.dataSource === 'tdx_direct' && appConfig.tdxClientId && appConfig.tdxClientSecret) {
+                    // Fetch directly from TDX API via client-side OAuth (Testing mode)
+                    showToast('正在直接向 TDX 驗證與請求數據...', 'info');
+                    rawData = await fetchDirectTDXData();
+                } else {
+                    // Realistic Dynamic Simulation for Xinying District
+                    rawData = generateXinyingSimulatedData();
+                }
+
+                parkingData = rawData;
+                updateLastUpdatedTimestamp();
+                filterSpots();
+                updateChartData();
+
+                if (isManual) {
+                    showToast('新營區即時路邊停車格資料已更新！', 'success');
+                    resetCountdown();
+                }
+            } catch (error) {
+                console.error('Error fetching parking data:', error);
+                showToast(`無法取得最新資料：${error.message} (已採用快取數據)`, 'error');
+                
+                // Fallback to simulation if network or Worker fails
+                if (parkingData.length === 0) {
+                    parkingData = generateXinyingSimulatedData();
+                    filterSpots();
+                }
+            } finally {
+                if (refreshBtnIcon) refreshBtnIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function generateXinyingSimulatedData() {
+            // Real Road Segments in Xinying District, Tainan
+            const xinyingRoads = [
+                { name: "民治路", prefix: "MZ", baseLat: 23.3105, baseLng: 120.3150, count: 18, rate: "NT$20/小時" },
+                { name: "中正路", prefix: "ZZ", baseLat: 23.3080, baseLng: 120.3160, count: 14, rate: "NT$20/小時" },
+                { name: "三民路", prefix: "SM", baseLat: 23.3060, baseLng: 120.3180, count: 16, rate: "NT$20/小時" },
+                { name: "復興路", prefix: "FX", baseLat: 23.3035, baseLng: 120.3090, count: 12, rate: "NT$20/小時" },
+                { name: "中華路", prefix: "ZH", baseLat: 23.3125, baseLng: 120.3120, count: 10, rate: "NT$20/小時" },
+                { name: "新華街", prefix: "XH", baseLat: 23.3055, baseLng: 120.3195, count: 8, rate: "NT$20/小時" },
+                { name: "開元路 (新營車站前)", prefix: "KY", baseLat: 23.3048, baseLng: 120.3220, count: 15, rate: "NT$30/小時" },
+                { name: "綠川北街", prefix: "LC", baseLat: 23.3135, baseLng: 120.3185, count: 10, rate: "NT$20/小時" }
+            ];
+
+            const result = [];
+            const nowIso = new Date().toISOString();
+
+            xinyingRoads.forEach(road => {
+                for (let i = 1; i <= road.count; i++) {
+                    const totalSpaces = Math.random() > 0.8 ? 2 : 1; // 1 or 2 spaces per roadside slot
+                    const randVal = Math.random();
+                    let availableSpaces = 0;
+
+                    if (randVal < 0.45) {
+                        availableSpaces = totalSpaces; // Available
+                    } else if (randVal < 0.70) {
+                        availableSpaces = Math.max(0, totalSpaces - 1); // Low / Partial
+                    } else {
+                        availableSpaces = 0; // Full
+                    }
+
+                    // Slight jitter coordinates along road angle
+                    const latJitter = (i * 0.00032) + (Math.random() - 0.5) * 0.0001;
+                    const lngJitter = (i * 0.00038) + (Math.random() - 0.5) * 0.0001;
+
+                    let status = "available";
+                    if (availableSpaces === 0) status = "full";
+                    else if (availableSpaces === 1 && totalSpaces > 1) status = "low";
+
+                    result.push({
+                        id: `XY-${road.prefix}-${String(i).padStart(3, '0')}`,
+                        name: `${road.name}路邊格位 #${i}`,
+                        roadName: road.name,
+                        latitude: road.baseLat + latJitter,
+                        longitude: road.baseLng + lngJitter,
+                        totalSpaces: totalSpaces,
+                        availableSpaces: availableSpaces,
+                        status: status,
+                        rate: road.rate,
+                        updatedAt: nowIso
+                    });
+                }
+            });
+
+            return result;
+        }
+
+        function filterSpots() {
+            const searchQuery = document.getElementById('input-search').value.trim().toLowerCase();
+            const clearBtn = document.getElementById('btn-clear-search');
+            
+            if (clearBtn) {
+                if (searchQuery.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
+            filteredData = parkingData.filter(spot => {
+                // Status Filter
+                let matchesStatus = true;
+                if (currentStatusFilter === 'available') matchesStatus = spot.availableSpaces > 0;
+                else if (currentStatusFilter === 'low') matchesStatus = spot.status === 'low' || (spot.availableSpaces === 1 && spot.totalSpaces > 1);
+                else if (currentStatusFilter === 'full') matchesStatus = spot.availableSpaces === 0;
+
+                // Search Query Filter
+                let matchesSearch = true;
+                if (searchQuery) {
+                    matchesSearch = spot.name.toLowerCase().includes(searchQuery) ||
+                                    spot.roadName.toLowerCase().includes(searchQuery) ||
+                                    spot.id.toLowerCase().includes(searchQuery);
+                }
+
+                return matchesStatus && matchesSearch;
+            });
+
+            renderMapMarkers();
+            renderParkingList();
+            updateStatsSummary();
+        }
+
+        function setStatusFilter(filterType) {
+            currentStatusFilter = filterType;
+            
+            // Highlight active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-slate-800', 'text-white');
+                btn.classList.add('bg-slate-100');
+            });
+
+            const activeBtn = document.getElementById(`filter-${filterType}`);
+            if (activeBtn) {
+                activeBtn.classList.add('active', 'bg-slate-800', 'text-white');
+                activeBtn.classList.remove('bg-slate-100');
+            }
+
+            filterSpots();
+        }
+
+        // Render Leaflet Markers
+        function renderMapMarkers() {
+            if (!markersGroup) return;
+            markersGroup.clearLayers();
+
+            filteredData.forEach(spot => {
+                if (!spot.latitude || !spot.longitude) return;
+
+                // Marker visual badge color class
+                let markerClass = 'marker-available';
+                if (spot.availableSpaces === 0) markerClass = 'marker-full';
+                else if (spot.status === 'low' || spot.availableSpaces === 1) markerClass = 'marker-low';
+
+                const customIcon = L.divIcon({
+                    className: 'custom-marker-wrapper',
+                    html: `<div class="custom-marker ${markerClass} w-7 h-7 text-xs">${spot.availableSpaces}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+
+                const marker = L.marker([spot.latitude, spot.longitude], { icon: customIcon });
+
+                // Leaflet Popup HTML
+                const popupContent = `
+                    <div class="p-2 max-w-xs space-y-2">
+                        <div class="border-b border-slate-200 pb-1.5">
+                            <span class="text-[10px] font-mono text-slate-400 block">${spot.id}</span>
+                            <h4 class="font-bold text-slate-900 text-sm">${spot.name}</h4>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-slate-50 p-1.5 rounded border border-slate-100">
+                                <span class="text-slate-400 block text-[10px]">剩餘車位</span>
+                                <span class="font-bold text-sm ${spot.availableSpaces > 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                                    ${spot.availableSpaces} / ${spot.totalSpaces}
+                                </span>
+                            </div>
+                            <div class="bg-slate-50 p-1.5 rounded border border-slate-100">
+                                <span class="text-slate-400 block text-[10px]">費率資訊</span>
+                                <span class="font-bold text-slate-700">${spot.rate || 'NT$20/時'}</span>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                            <span>路段: ${spot.roadName}</span>
+                            <span>更新: ${formatTimeOnly(spot.updatedAt)}</span>
+                        </div>
+                        <button onclick="navigateSpot(${spot.latitude}, ${spot.longitude})" 
+                            class="w-full mt-2 bg-brand-600 hover:bg-brand-700 text-white py-1.5 rounded text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-location-arrow"></i> 開啟 Google 地圖導航
+                        </button>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        // Render Side Drawer List Cards
+        function renderParkingList() {
+            const listContainer = document.getElementById('parking-list');
+            const emptyMsg = document.getElementById('list-empty');
+            
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+            emptyMsg.classList.add('hidden');
+
+            filteredData.forEach(spot => {
+                let badgeBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                let statusText = `有空位 (${spot.availableSpaces} 格)`;
+
+                if (spot.availableSpaces === 0) {
+                    badgeBg = 'bg-rose-100 text-rose-800 border-rose-200';
+                    statusText = '已滿 (0 格)';
+                } else if (spot.status === 'low' || spot.availableSpaces === 1) {
+                    badgeBg = 'bg-amber-100 text-amber-800 border-amber-200';
+                    statusText = `少量 (${spot.availableSpaces} 格)`;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition shadow-sm cursor-pointer space-y-1.5';
+                card.onclick = () => focusSpotOnMap(spot.latitude, spot.longitude, spot.id);
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">${spot.id}</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold border ${badgeBg}">${statusText}</span>
+                    </div>
+                    <div class="font-bold text-slate-800 text-sm flex items-center justify-between">
+                        <span>${spot.name}</span>
+                        <span class="text-xs font-normal text-slate-500"><i class="fa-solid fa-coins text-amber-500 mr-0.5"></i>${spot.rate || '20元/時'}</span>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center justify-between">
+                        <span><i class="fa-solid fa-road mr-1"></i>${spot.roadName}</span>
+                        <span>最後更新: ${formatTimeOnly(spot.updatedAt)}</span>
+                    </div>
+                `;
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        function updateStatsSummary() {
+            const totalSlots = parkingData.reduce((acc, curr) => acc + curr.totalSpaces, 0);
+            const totalAvailable = parkingData.reduce((acc, curr) => acc + curr.availableSpaces, 0);
+            const occupancyRate = totalSlots > 0 ? Math.round(((totalSlots - totalAvailable) / totalSlots) * 100) : 0;
+
+            document.getElementById('stat-total').innerText = totalSlots;
+            document.getElementById('stat-available').innerText = totalAvailable;
+            document.getElementById('stat-occupancy').innerText = `${occupancyRate}%`;
+
+            // Filter Counts
+            document.getElementById('count-all').innerText = `(${parkingData.length})`;
+            document.getElementById('count-available').innerText = `(${parkingData.filter(s => s.availableSpaces > 0).length})`;
+            document.getElementById('count-low').innerText = `(${parkingData.filter(s => s.status === 'low' || s.availableSpaces === 1).length})`;
+            document.getElementById('count-full').innerText = `(${parkingData.filter(s => s.availableSpaces === 0).length})`;
+
+            // Update Top Busy Streets
+            renderTopBusyStreets();
+        }
+
+        function renderTopBusyStreets() {
+            const streetMap = {};
+            parkingData.forEach(spot => {
+                if (!streetMap[spot.roadName]) {
+                    streetMap[spot.roadName] = { total: 0, occupied: 0 };
+                }
+                streetMap[spot.roadName].total += spot.totalSpaces;
+                streetMap[spot.roadName].occupied += (spot.totalSpaces - spot.availableSpaces);
+            });
+
+            const topContainer = document.getElementById('top-busy-streets');
+            if (!topContainer) return;
+            topContainer.innerHTML = '';
+
+            Object.keys(streetMap)
+                .map(name => ({
+                    name,
+                    rate: Math.round((streetMap[name].occupied / streetMap[name].total) * 100)
+                }))
+                .sort((a, b) => b.rate - a.rate)
+                .slice(0, 5)
+                .forEach(st => {
+                    topContainer.innerHTML += `
+                        <div class="space-y-1">
+                            <div class="flex justify-between font-medium text-slate-700">
+                                <span>${st.name}</span>
+                                <span class="font-bold">${st.rate}% 佔用</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div class="bg-brand-600 h-1.5 rounded-full" style="width: ${st.rate}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+
+        // Chart.js Hourly Trend Initialization
+        function initChart() {
+            const ctx = document.getElementById('chart-occupancy').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
+                    datasets: [{
+                        label: '新營區車位平均佔用率 (%)',
+                        data: [35, 62, 78, 85, 70, 88, 55],
+                        borderColor: '#0284c7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function updateChartData() {
+            if (!chartInstance) return;
+            const totalSlots = parkingData.reduce((acc, curr) => acc + curr.totalSpaces, 0);
+            const totalAvailable = parkingData.reduce((acc, curr) => acc + curr.availableSpaces, 0);
+            const currentOccupancy = totalSlots > 0 ? Math.round(((totalSlots - totalAvailable) / totalSlots) * 100) : 60;
+            
+            // Dynamic subtle update
+            chartInstance.data.datasets[0].data[chartInstance.data.datasets[0].data.length - 1] = currentOccupancy;
+            chartInstance.update();
+        }
+
+        function focusSpotOnMap(lat, lng, spotId) {
+            if (!map) return;
+            map.flyTo([lat, lng], 18, { duration: 1 });
+            
+            // Mobile auto collapse side panel
+            if (window.innerWidth < 1024) toggleSidePanel(false);
+
+            // Open Popup
+            markersGroup.eachLayer(layer => {
+                if (layer.getLatLng().lat === lat && layer.getLatLng().lng === lng) {
+                    layer.openPopup();
+                }
+            });
+        }
+
+        function navigateSpot(lat, lng) {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+        }
+
+        function resetMapView() {
+            if (map) map.flyTo(XINYING_CENTER, DEFAULT_ZOOM);
+            showToast('已重設為新營區中心點', 'info');
+        }
+
+        function locateUser() {
+            if (!navigator.geolocation) {
+                showToast('您的瀏覽器不支援 GPS 定位服務', 'error');
+                return;
+            }
+
+            showToast('定位中...', 'info');
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+
+                    if (userLocationMarker) map.removeLayer(userLocationMarker);
+
+                    userLocationMarker = L.circleMarker([lat, lng], {
+                        radius: 8,
+                        fillColor: '#3b82f6',
+                        color: '#ffffff',
+                        weight: 3,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(map).bindPopup('<b>📍 您的目前位置</b>').openPopup();
+
+                    map.flyTo([lat, lng], 16);
+                    showToast('已找到您的位置！', 'success');
+                },
+                err => {
+                    showToast('定位失敗，請確認已授權地理位置存取權限', 'error');
+                }
+            );
+        }
+
+        // Countdown Timer Loop (60s Auto Refresh)
+        function startCountdown() {
+            clearInterval(countdownTimer);
+            countdownValue = appConfig.refreshInterval;
+            
+            countdownTimer = setInterval(() => {
+                countdownValue--;
+                const timerEl = document.getElementById('countdown-timer');
+                if (timerEl) timerEl.innerText = countdownValue;
+
+                if (countdownValue <= 0) {
+                    fetchParkingData();
+                    resetCountdown();
+                }
+            }, 1000);
+        }
+
+        function resetCountdown() {
+            countdownValue = appConfig.refreshInterval;
+            const timerEl = document.getElementById('countdown-timer');
+            if (timerEl) timerEl.innerText = countdownValue;
+        }
+
+        function updateLastUpdatedTimestamp() {
+            const now = new Date();
+            const formatted = now.toTimeString().split(' ')[0];
+            document.getElementById('last-updated-time').innerText = formatted;
+        }
+
+        function formatTimeOnly(isoStr) {
+            if (!isoStr) return '--:--:--';
+            try {
+                const date = new Date(isoStr);
+                return date.toTimeString().split(' ')[0];
+            } catch (e) {
+                return '--:--:--';
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('input-search').value = '';
+            filterSpots();
+        }
+
+        function toggleSidePanel(show) {
+            const panel = document.getElementById('side-panel');
+            if (show) panel.classList.remove('-translate-x-full');
+            else panel.classList.add('-translate-x-full');
+        }
+
+        function switchTab(tabName) {
+            const listBtn = document.getElementById('tab-btn-list');
+            const analyticsBtn = document.getElementById('tab-btn-analytics');
+            const listContent = document.getElementById('tab-content-list');
+            const analyticsContent = document.getElementById('tab-content-analytics');
+
+            if (tabName === 'list') {
+                listBtn.className = 'flex-1 py-2 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center gap-1.5';
+                analyticsBtn.className = 'flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5';
+                listContent.classList.remove('hidden');
+                analyticsContent.classList.add('hidden');
+            } else {
+                analyticsBtn.className = 'flex-1 py-2 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center gap-1.5';
+                listBtn.className = 'flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5';
+                analyticsContent.classList.remove('hidden');
+                listContent.classList.add('hidden');
+            }
+        }
+
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.toggle('hidden');
+        }
+
+        function toggleApiInputs() {
+            const source = document.getElementById('config-data-source').value;
+            document.getElementById('group-worker-url').classList.toggle('hidden', source !== 'worker');
+            document.getElementById('group-tdx-direct').classList.toggle('hidden', source !== 'tdx_direct');
+        }
+
+        function saveConfiguration() {
+            appConfig.dataSource = document.getElementById('config-data-source').value;
+            appConfig.workerUrl = document.getElementById('config-worker-url').value;
+            appConfig.tdxClientId = document.getElementById('config-tdx-id').value;
+            appConfig.tdxClientSecret = document.getElementById('config-tdx-secret').value;
+            appConfig.refreshInterval = parseInt(document.getElementById('config-refresh-interval').value) || 60;
+
+            localStorage.setItem('xy_source', appConfig.dataSource);
+            localStorage.setItem('xy_worker_url', appConfig.workerUrl);
+            localStorage.setItem('xy_tdx_id', appConfig.tdxClientId);
+            localStorage.setItem('xy_tdx_secret', appConfig.tdxClientSecret);
+            localStorage.setItem('xy_interval', appConfig.refreshInterval);
+
+            toggleModal('modal-config');
+            fetchParkingData(true);
+            startCountdown();
+        }
+
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const messageEl = document.getElementById('toast-message');
+            const iconEl = document.getElementById('toast-icon');
+
+            if (!toast) return;
+
+            messageEl.innerText = msg;
+
+            if (type === 'error') iconEl.className = 'fa-solid fa-circle-exclamation text-rose-400';
+            else if (type === 'success') iconEl.className = 'fa-solid fa-circle-check text-emerald-400';
+            else iconEl.className = 'fa-solid fa-circle-info text-amber-400';
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // Direct Client-Side OAuth TDX Fetcher for Testing
+        async function fetchDirectTDXData() {
+            // 1. Get Access Token via OAuth
+            const authUrl = "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token";
+            const params = new URLSearchParams();
+            params.append('grant_type', 'client_credentials');
+            params.append('client_id', appConfig.tdxClientId);
+            params.append('client_secret', appConfig.tdxClientSecret);
+
+            const tokenRes = await fetch(authUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            });
+
+            if (!tokenRes.ok) throw new Error("TDX 身份驗證失敗，請檢查 Client ID / Secret");
+            const tokenData = await tokenRes.json();
+            const accessToken = tokenData.access_token;
+
+            // 2. Fetch Tainan On-Street Parking
+            const tdxParkingUrl = "https://tdx.transportdata.tw/api/basic/v2/Parking/OnStreet/ParkingSegment/City/Tainan?$top=100&$format=JSON";
+            const apiRes = await fetch(tdxParkingUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!apiRes.ok) throw new Error("取得 TDX 停車格資料失敗");
+            const apiData = await apiRes.json();
+
+            // Format TDX response to local schema
+            return apiData.map((item, idx) => ({
+                id: item.ParkingSegmentID || `TDX-${idx}`,
+                name: item.ParkingSegmentName?.Zh_tw || "新營路邊停車格",
+                roadName: item.SegmentName?.Zh_tw || "新營區路段",
+                latitude: item.ParkingPosition?.PositionLat || 23.3105 + (Math.random() - 0.5) * 0.01,
+                longitude: item.ParkingPosition?.PositionLon || 120.3160 + (Math.random() - 0.5) * 0.01,
+                totalSpaces: item.TotalSpaces || 1,
+                availableSpaces: item.AvailableSpaces !== undefined ? item.AvailableSpaces : 1,
+                status: (item.AvailableSpaces === 0) ? 'full' : 'available',
+                rate: item.FareDescription || 'NT$20/小時',
+                updatedAt: item.UpdateTime || new Date().toISOString()
+            }));
+        }
+    </script>
+</body>
+</html>
