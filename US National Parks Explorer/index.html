@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US National Parks Explorer</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Libre Baskerville and Bitter Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,700;1,700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Libre Baskerville', serif; background-color: #223C31; color: #DDDCCB; }
+        .font-bitter-bold { font-family: 'Bitter', serif; font-weight: 700; }
+        #map { width: 100%; height: 100%; z-index: 10; background-color: #303032; }
+        
+        /* Custom scrollbar matching earth tones */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #303032; }
+        ::-webkit-scrollbar-thumb { background: #C2AA81; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb-hover { background: #804E2D; }
+
+        /* Custom marker styling using earth tones */
+        .custom-map-marker div {
+            background-color: #576F3F !important;
+            border: 2px solid #DDDCCB !important;
+            color: #DDDCCB !important;
+        }
+        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+            background-color: rgba(34, 60, 49, 0.8) !important;
+        }
+        .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+            background-color: #576F3F !important;
+            color: #DDDCCB !important;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-[#223C31] border-b border-[#303032] px-6 py-4 flex items-center justify-between shadow-md z-20">
+        <div class="flex items-center space-x-3">
+            <div class="bg-[#576F3F] text-[#DDDCCB] p-2.5 rounded-xl shadow-lg flex items-center justify-center">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/9/97/Logo_of_the_United_States_National_Park_Service.svg?utm_source=gan.wikipedia.org&utm_campaign=index&utm_content=original" alt="Tree" class="w-5 h-5">
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-[#DDDCCB] font-bitter-bold">US National Parks Explorer</h1>
+                <p class="text-xs text-[#C2AA81]">Discover 63 Majestic National Parks across the United States</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="park-count-badge" class="bg-[#576F3F]/30 text-[#A6C0CA] text-xs font-semibold px-3 py-1 rounded-full border border-[#576F3F]">
+                Loading Parks...
+            </span>
+            <button id="toggle-sidebar-mobile" class="md:hidden bg-[#303032] hover:bg-[#804E2D] text-[#DDDCCB] p-2 rounded-lg transition">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex relative overflow-hidden">
+        
+        <!-- Sidebar Drawer -->
+        <aside id="sidebar" class="absolute md:relative inset-y-0 left-0 z-30 w-full sm:w-96 bg-[#223C31] border-r border-[#303032] flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none">
+            
+            <!-- Sidebar Header & Search -->
+            <div class="p-4 border-b border-[#303032] space-y-3 bg-[#223C31]/95 backdrop-blur">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-semibold text-[#DDDCCB] text-lg flex items-center gap-2 font-bitter-bold">
+                        <i class="fa-solid fa-compass text-[#DFA237]"></i> Parks Directory
+                    </h2>
+                    <button id="close-sidebar" class="md:hidden text-[#C2AA81] hover:text-[#DDDCCB] p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                
+                <!-- Search input -->
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#C2AA81]">
+                        <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                    </span>
+                    <input type="text" id="search-input" placeholder="Search parks by name, description..." class="w-full pl-9 pr-4 py-2 bg-[#303032] border border-[#303032] rounded-xl text-sm text-[#DDDCCB] placeholder-[#C2AA81]/60 focus:outline-none focus:ring-2 focus:ring-[#DFA237] focus:border-transparent transition">
+                </div>
+
+                <!-- State Filter -->
+                <div class="flex items-center space-x-2">
+                    <div class="relative flex-1">
+                        <select id="state-filter" class="w-full px-3 py-2 bg-[#303032] border border-[#303032] rounded-xl text-sm text-[#DDDCCB] focus:outline-none focus:ring-2 focus:ring-[#DFA237] appearance-none">
+                            <option value="">All States / Locations</option>
+                        </select>
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-[#C2AA81] text-xs">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </span>
+                    </div>
+                    <button id="reset-filters" class="px-3 py-2 bg-[#303032] hover:bg-[#804E2D] text-[#DDDCCB] text-sm font-medium rounded-xl transition flex items-center gap-1 border border-[#303032]">
+                        <i class="fa-solid fa-rotate-right text-xs text-[#C2AA81]"></i> Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Park List Container -->
+            <div id="parks-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <!-- Dynamic cards injected here -->
+                <div class="text-center py-12 text-[#C2AA81]">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-[#DFA237]"></i>
+                    <p class="text-sm">Loading national parks dataset...</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="flex-1 relative bg-[#303032]">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- Detail Slide-over Panel (Drawer) for Selected Park -->
+    <div id="detail-drawer" class="fixed inset-y-0 right-0 z-40 w-full sm:w-[450px] bg-[#223C31] border-l border-[#303032] shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+        <div class="p-4 bg-[#303032] border-b border-[#223C31] flex items-center justify-between">
+            <span class="text-xs uppercase tracking-wider font-bold text-[#DFA237] bg-[#DFA237]/10 px-2.5 py-1 rounded-md border border-[#DFA237]/30">Park Details</span>
+            <button id="close-drawer" class="text-[#C2AA81] hover:text-[#DDDCCB] p-2 rounded-lg bg-[#223C31] hover:bg-[#804E2D] transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+        <div id="drawer-content" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <!-- Dynamic detail content -->
+        </div>
+    </div>
+
+    <!-- Backdrop for mobile drawer -->
+    <div id="backdrop" class="fixed inset-0 bg-black/60 z-20 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        // Complete dataset parsed from df_2.csv with accurate geographic coordinates and metadata
+        const parksData = [
+            {
+                id: 0,
+                name: "Acadia",
+                location: "Maine",
+                lat: 44.35,
+                lng: -68.21,
+                dateEstablished: "February 26, 1919",
+                area: "49,071.40 acres (198.6 km²)",
+                visitors: 4069098,
+                image: "https://www.mensjournal.com/.image/MTk2MTM2NDM3NTU2ODQ4MTMz/acadia.jpg?profile=share1-1",
+                description: "Covering most of Mount Desert Island and other coastal islands, Acadia features the tallest mountain on the Atlantic coast of the United States, granite peaks, ocean shoreline, woodlands, and lakes. There are freshwater, estuary, forest, and intertidal habitats."
+            },
+            {
+                id: 1,
+                name: "American Samoa",
+                location: "American Samoa",
+                lat: -14.25,
+                lng: -170.68,
+                dateEstablished: "October 31, 1988",
+                area: "8,256.67 acres (33.4 km²)",
+                visitors: 8495,
+                image: "https://i0.wp.com/americanfieldtrip.com/wp-content/uploads/2018/05/american-samoa-67.jpg?fit=1000%2C667&ssl=1",
+                description: "The southernmost national park is on three Samoan islands in the South Pacific. It protects coral reefs, rainforests, volcanic mountains, and white beaches. The area is also home to flying foxes, brown boobies, sea turtles, and 900 species of fish."
+            },
+            {
+                id: 2,
+                name: "Arches",
+                location: "Utah",
+                lat: 38.68,
+                lng: -109.57,
+                dateEstablished: "November 12, 1971",
+                area: "76,678.98 acres (310.3 km²)",
+                visitors: 1806865,
+                image: "https://www.alltrails.com/mugen/image/location-app-router?url=https%3A%2F%2Fimages.alltrails.com%2FeyJidWNrZXQiOiJhc3NldHMuYWxsdHJhaWxzLmNvbSIsImtleSI6InVwbG9hZHMvcGhvdG8vaW1hZ2UvMTIzMzUxNDA0L2JiMTAzOTFmYjZmYjI2ZDdhOGVjNThjOGE5M2Y0MzA1LmpwZyIsImVkaXRzIjp7InRvRm9ybWF0Ijoid2VicCIsInJlc2l6ZSI6eyJ3aWR0aCI6IjEwODAiLCJoZWlnaHQiOiI3MDAiLCJmaXQiOiJjb3ZlciJ9LCJyb3RhdGUiOm51bGwsImpwZWciOnsidHJlbGxpc1F1YW50aXNhdGlvbiI6dHJ1ZSwib3ZlcnNob290RGVyaW5naW5nIjp0cnVlLCJvcHRpbWlzZVNjYW5zIjp0cnVlLCJxdWFudGlzYXRpb25UYWJsZSI6M319fQ%3D%3D&w=3840&q=90",
+                description: "This site features more than 2,000 natural sandstone arches, with some of the most popular arches in the park being Delicate Arch, Landscape Arch and Double Arch. Millions of years of erosion have created these structures in a desert climate where the arid ground has life-sustaining biological soil crusts and potholes that serve as natural water-collecting basins."
+            },
+            {
+                id: 3,
+                name: "Badlands",
+                location: "South Dakota",
+                lat: 43.75,
+                lng: -102.50,
+                dateEstablished: "November 10, 1978",
+                area: "242,755.94 acres (982.4 km²)",
+                visitors: 1224226,
+                image: "https://images.squarespace-cdn.com/content/v1/6226f62738f4f73d2b353e79/e88a5042-0c74-4b0b-acc9-d88984fac632/DSC05100.jpg",
+                description: "The Badlands are a collection of buttes, pinnacles, spires, and mixed-grass prairies within the drainage basin of the White River, in southwestern South Dakota. They contain the largest known assemblage of late Eocene and Oligocene mammal fossils. Wildlife includes bison, bighorn sheep, black-footed ferrets, and prairie dogs."
+            },
+            {
+                id: 4,
+                name: "Big Bend",
+                location: "Texas",
+                lat: 29.25,
+                lng: -103.25,
+                dateEstablished: "June 12, 1944",
+                area: "801,163.21 acres (3,242.2 km²)",
+                visitors: 581220,
+                image: "https://texaslodging.com/wp-content/uploads/2019/09/Jeremy-T.-Walls.jpg",
+                description: "Named for the prominent bend in the Rio Grande along the U.S.–Mexico border, this park encompasses a large and remote part of the Chihuahuan Desert. Its main attraction is backcountry recreation in the arid Chisos Mountains and in canyons along the river."
+            },
+            {
+                id: 5,
+                name: "Biscayne",
+                location: "Florida",
+                lat: 25.65,
+                lng: -80.08,
+                dateEstablished: "June 28, 1980",
+                area: "172,971.11 acres (700.0 km²)",
+                visitors: 705655,
+                image: "https://www.nps.gov/bisc/learn/photosmultimedia/images/BISC-UW-250711-2.jpg",
+                description: "Centering on Biscayne Bay in the Florida Keys, this park is 95% water and protects the northernmost part of the Florida Reef. Mangrove forests line the shoreline, and four marine ecosystems span the area: the shoreline mangrove swamp, Biscayne Bay, the Florida Keys keys, and coral reefs."
+            },
+            {
+                id: 6,
+                name: "Black Canyon of the Gunnison",
+                location: "Colorado",
+                lat: 38.57,
+                lng: -107.72,
+                dateEstablished: "October 21, 1999",
+                area: "30,750.33 acres (124.4 km²)",
+                visitors: 330198,
+                image: "https://www.nps.gov/blca/planyourvisit/images/BLCA-April-2024-panorama.jpg",
+                description: "Protects a deeply carved, steep-walled gorge formed by the Gunnison River. The park features some of the steepest cliffs, oldest rock, and most craggy spires in North America, all formed of dark Precambrian gneiss and schist."
+            },
+            {
+                id: 7,
+                name: "Bryce Canyon",
+                location: "Utah",
+                lat: 37.57,
+                lng: -112.18,
+                dateEstablished: "February 25, 1928",
+                area: "35,835.08 acres (145.0 km²)",
+                visitors: 2104600,
+                image: "https://images.ctfassets.net/0wjmk6wgfops/5H0C47VE0tGc6OnV46NSPB/9351d1b93f191c0c2849695e744ed7a6/_dccebea5-5efc-483f-9f5e-07e81042e64f.6b8f083311.jpg",
+                description: "A geological amphitheater located in southwestern Utah, notable for its unique collection of geological structures called hoodoos. These crimson-colored spire formations were created by frost weathering and stream erosion of the river and lake bed sedimentary rocks."
+            },
+            {
+                id: 8,
+                name: "Canyonlands",
+                location: "Utah",
+                lat: 38.20,
+                lng: -109.93,
+                dateEstablished: "September 12, 1964",
+                area: "337,597.83 acres (1,366.2 km²)",
+                visitors: 911594,
+                image: "https://lirp.cdn-website.com/8237dfbc/dms3rep/multi/opt/moab-canyonlands-island-sky-1920w.jpg",
+                description: "Preserves a colorful landscape eroded into countless canyons, mesas, and buttes by the Colorado River and the Green River. The park is divided into four distinct districts: the Island in the Sky, the Needles, the Maze, and the rivers themselves."
+            },
+            {
+                id: 9,
+                name: "Capitol Reef",
+                location: "Utah",
+                lat: 38.20,
+                lng: -111.17,
+                dateEstablished: "December 18, 1971",
+                area: "241,904.50 acres (979.0 km²)",
+                visitors: 1228633,
+                image: "https://ctfassets.ksldigital.com/0wjmk6wgfops/17zLospZMsSBcllN5EC0MQ/fbd81075e24d4ec0b98ecbb448a2c046/24e6e27735_b19c78fc-b382-49ec-98db-033bf7316671.jpg?w=1280&h=800&fit=fill&f=center&q=80",
+                description: "Surrounds the Waterpocket Fold, a gigantic 100-mile long warp in the Earth's crust. It is a desert landscape characterized by butterscotch-colored sandstone monoliths, cliffs, and striking rock formations."
+            },
+            {
+                id: 10,
+                name: "Carlsbad Caverns",
+                location: "New Mexico",
+                lat: 32.17,
+                lng: -104.44,
+                dateEstablished: "May 14, 1930",
+                area: "46,766.45 acres (189.3 km²)",
+                visitors: 408891,
+                image: "https://upload.wikimedia.org/wikipedia/commons/d/dd/Carlsbad_Interior_Formations.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Features a subterranean cavern system consisting of more than 119 limestone caves. The Big Room is the largest single cave chamber by volume in North America, sculpted by sulfuric acid dissolving limestone."
+            },
+            {
+                id: 11,
+                name: "Channel Islands",
+                location: "California",
+                lat: 34.01,
+                lng: -119.42,
+                dateEstablished: "March 5, 1980",
+                area: "249,561.00 acres (1,009.9 km²)",
+                visitors: 329653,
+                image: "https://i.natgeofe.com/n/77da8c99-8278-4eb3-8a7b-75a0044355af/resized-NationalGeographic_2206862.jpg",
+                description: "Encompasses five of the eight Channel Islands off the coast of California. The park is renowned for its wealth of natural and cultural resources, often called the 'Galapagos of North America' due to its high level of endemic plants and animals."
+            },
+            {
+                id: 12,
+                name: "Congaree",
+                location: "South Carolina",
+                lat: 33.79,
+                lng: -80.78,
+                dateEstablished: "November 10, 2003",
+                area: "26,692.6 km² (10,802.1 acres)",
+                visitors: 204522,
+                image: "https://www.nps.gov/cong/planyourvisit/images/Boardwalk.jpg?maxwidth=1300&autorotate=false",
+                description: "Preserves the largest tract of old-growth bottomland hardwood forest left in the United States. The floodplain trees are among the tallest in eastern North America, with a massive canopy and swamp boardwalks."
+            },
+            {
+                id: 13,
+                name: "Crater Lake",
+                location: "Oregon",
+                lat: 42.94,
+                lng: -122.10,
+                dateEstablished: "May 22, 1902",
+                area: "183,224.05 acres (741.5 km²)",
+                visitors: 577398,
+                image: "https://upload.wikimedia.org/wikipedia/commons/8/8d/Above_Crater_Lake_%28cropped%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Famous for its deep blue color and water purity, Crater Lake occupies the caldera of Mount Mazama, a destroyed volcano. It is the deepest lake in the United States and renowned for its scenic beauty."
+            },
+            {
+                id: 14,
+                name: "Cuyahoga Valley",
+                location: "Ohio",
+                lat: 41.24,
+                lng: -81.56,
+                dateEstablished: "October 11, 2000",
+                area: "32,572.35 acres (131.8 km²)",
+                visitors: 2913576,
+                image: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Cuyahoga_Valley_National_Park_20.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "A winding river valley along the Cuyahoga River featuring waterfalls, hills, and open farmlands. It connects urban Cleveland and Akron with nature trails, historic train lines, and rich native flora and fauna."
+            },
+            {
+                id: 15,
+                name: "Death Valley",
+                location: "California, Nevada",
+                lat: 36.46,
+                lng: -116.86,
+                dateEstablished: "October 31, 1994",
+                area: "3,373,063.72 acres (13,650.3 km²)",
+                visitors: 1146641,
+                image: "https://upload.wikimedia.org/wikipedia/commons/8/87/Mesquite_Sand_Dunes_in_Death_Valley.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "A desert valley located in Eastern California, bounded by mountain ranges. It is the hottest, driest, and lowest national park in the United States, famous for Badwater Basin, salt flats, sand dunes, and colorful badlands."
+            },
+            {
+                id: 16,
+                name: "Denali",
+                location: "Alaska",
+                lat: 63.33,
+                lng: -150.50,
+                dateEstablished: "February 26, 1917",
+                area: "4,740,911.16 acres (19,185.8 km²)",
+                visitors: 501192,
+                image: "https://uploads.alaska.org/destinations/denali-national-park/_960xAUTO_fit_center-center_65_none/2057971/sharath-chandra-yellapragada-1920_612dac0786593-DenaliNationalPark-alaska-untitled.jpg",
+                description: "Centering on Denali, the highest mountain in North America (20,310 feet). The vast wilderness features pristine taiga forests, high alpine tundra, glaciers, and abundant wildlife such as grizzly bears, wolves, moose, and Dall sheep."
+            },
+            {
+                id: 17,
+                name: "Dry Tortugas",
+                location: "Florida",
+                lat: 24.63,
+                lng: -82.87,
+                dateEstablished: "October 26, 1992",
+                area: "64,701.14 acres (261.8 km²)",
+                visitors: 83804,
+                image: "https://upload.wikimedia.org/wikipedia/commons/5/5f/Fort-Jefferson_Dry-Tortugas.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Located at the western end of the Florida Keys, this park features Fort Jefferson, a massive coastal fortress, surrounded by crystal-clear waters, coral reefs, and abundant marine life and nesting seabirds."
+            },
+            {
+                id: 18,
+                name: "Everglades",
+                location: "Florida",
+                lat: 25.32,
+                lng: -80.93,
+                dateEstablished: "May 30, 1934",
+                area: "1,508,938.57 acres (6,106.5 km²)",
+                visitors: 942859,
+                image: "https://upload.wikimedia.org/wikipedia/commons/2/2a/Sunset_over_the_River_of_Grass%2C_NPSphoto%2C_G.Gardner_%289255157507%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "The largest subtropical wilderness in the United States. It consists of coastal mangroves, sawgrass marshes, and tropical hammocks, home to rare and endangered species including the American alligator, American crocodile, and Florida panther."
+            },
+            {
+                id: 19,
+                name: "Gates of the Arctic",
+                location: "Alaska",
+                lat: 67.78,
+                lng: -153.30,
+                dateEstablished: "December 2, 1980",
+                area: "7,523,897.45 acres (30,448.2 km²)",
+                visitors: 7362,
+                image: "https://upload.wikimedia.org/wikipedia/commons/f/fc/Remote_river_in_Gates_of_the_Arctic_%2816524035298%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "A remote, roadless wilderness entirely north of the Arctic Circle. It protects portions of the Brooks Range, pristine arctic rivers, glacial valleys, and the traditional migration routes of caribou herds."
+            },
+            {
+                id: 20,
+                name: "Gateway Arch",
+                location: "Missouri",
+                lat: 38.62,
+                lng: -90.18,
+                dateEstablished: "February 22, 2018",
+                area: "90.99 acres (0.4 km²)",
+                visitors: 1625717,
+                image: "https://www.nps.gov/common/uploads/structured_data/0994EFCF-D603-8430-46D02EF520597633.jpeg",
+                description: "A monument and national park commemorating the westward expansion of the United States. Features the iconic 630-foot stainless steel Gateway Arch designed by Eero Saarinen on the banks of the Mississippi River."
+            },
+            {
+                id: 21,
+                name: "Glacier",
+                location: "Montana",
+                lat: 48.80,
+                lng: -113.80,
+                dateEstablished: "May 11, 1910",
+                area: "1,013,125.99 acres (4,100.0 km²)",
+                visitors: 3048839,
+                image: "https://upload.wikimedia.org/wikipedia/commons/5/51/Mountain_Goat_at_Hidden_Lake.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "A pristine wilderness area in Montana's Rocky Mountains with glacier-carved peaks, pristine lakes, alpine meadows, and extensive forests. It forms part of the Waterton-Glacier International Peace Park across the Canadian border."
+            },
+            {
+                id: 22,
+                name: "Glacier Bay",
+                location: "Alaska",
+                lat: 58.50,
+                lng: -137.00,
+                dateEstablished: "December 2, 1980",
+                area: "3,223,383.43 acres (13,044.5 km²)",
+                visitors: 397143,
+                image: "https://upload.wikimedia.org/wikipedia/commons/b/bf/A045%2C_Glacier_Bay_National_Park%2C_Alaska%2C_USA%2C_Johns_Hopkins_Glacier%2C_2002.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Features tidewater glaciers, snow-capped mountains, ocean coves, and fjords. A marine wonderland where humpback whales, sea otters, and harbor seals thrive in deep glacial waters."
+            },
+            {
+                id: 23,
+                name: "Grand Canyon",
+                location: "Arizona",
+                lat: 36.06,
+                lng: -112.14,
+                dateEstablished: "February 26, 1919",
+                area: "1,217,403.32 acres (4,926.6 km²)",
+                visitors: 4734297,
+                image: "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/Dawn_on_the_S_rim_of_the_Grand_Canyon_%288645178272%29.jpg/1280px-Dawn_on_the_S_rim_of_the_Grand_Canyon_%288645178272%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+                description: "World-renowned natural wonder carved by the Colorado River. The massive, steep-sided gorge reveals millions of years of geological history in layered bands of colorful rock."
+            },
+            {
+                id: 24,
+                name: "Grand Teton",
+                location: "Wyoming",
+                lat: 43.73,
+                lng: -110.80,
+                dateEstablished: "February 26, 1929",
+                area: "310,044.36 acres (1,254.7 km²)",
+                visitors: 3493995,
+                image: "https://www.nps.gov/common/uploads/structured_data/76BB60E6-05CF-3ACF-A42B3397EC65B9AB.jpg",
+                description: "Dominated by the majestic peaks of the Teton Range rising sharply above the valley of Jackson Hole. Features pristine alpine lakes, rushing rivers, and abundant wildlife including elk, moose, and grizzly bears."
+            },
+            {
+                id: 25,
+                name: "Great Basin",
+                location: "Nevada",
+                lat: 38.98,
+                lng: -114.30,
+                dateEstablished: "October 27, 1986",
+                area: "77,180.00 acres (312.3 km²)",
+                visitors: 142270,
+                image: "https://upload.wikimedia.org/wikipedia/commons/b/be/Prometheus_Wheeler.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Protects diverse habitats from sagebrush foothills to alpine lakes and limestone caves (Lehman Caves). Home to ancient bristlecone pines, some of the oldest living organisms on Earth."
+            },
+            {
+                id: 26,
+                name: "Great Sand Dunes",
+                location: "Colorado",
+                lat: 37.73,
+                lng: -105.51,
+                dateEstablished: "September 13, 2004",
+                area: "44,246.00 acres (179.1 km²)",
+                visitors: 493425,
+                image: "https://www.nps.gov/grsa/planyourvisit/images/53755994950_5727b441b1_o.jpg?maxwidth=1300&maxheight=1300&autorotate=false&format=webp",
+                description: "Contains the tallest sand dunes in North America, rising up to 750 feet against the dramatic backdrop of the rugged Sangre de Cristo Mountains."
+            },
+            {
+                id: 27,
+                name: "Great Smoky Mountains",
+                location: "North Carolina, Tennessee",
+                lat: 35.68,
+                lng: -83.53,
+                dateEstablished: "June 15, 1934",
+                area: "522,426.88 acres (2,114.2 km²)",
+                visitors: 14161548,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C80F6C9-1DD8-B71B-0B33F35922A21B3B.jpg",
+                description: "Renowned for its plant and animal life, the beauty of its ancient mountains, and the quality of its remnant Appalachian mountain culture. It is the most visited national park in the United States."
+            },
+            {
+                id: 28,
+                name: "Guadalupe Mountains",
+                location: "Texas",
+                lat: 31.92,
+                lng: -104.87,
+                dateEstablished: "October 15, 1966",
+                area: "86,367.10 acres (349.5 km²)",
+                visitors: 243297,
+                image: "https://www.nps.gov/common/uploads/cropped_image/primary/E61F3909-0ADA-75E0-30E3A72135DC0E30.jpg?width=1300&quality=90&mode=crop",
+                description: "Features Guadalupe Peak, the highest point in Texas, along with the world's most extensive Permian fossil reef, rugged canyons, and autumn-hued maple forests."
+            },
+            {
+                id: 29,
+                name: "Haleakalā",
+                location: "Hawaii",
+                lat: 20.72,
+                lng: -156.17,
+                dateEstablished: "July 1, 1916",
+                area: "33,264.62 acres (134.6 km²)",
+                visitors: 853180,
+                image: "https://upload.wikimedia.org/wikipedia/commons/4/48/Haleakala_National_Park_02.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Centered around Haleakalā, a massive volcanic crater on Maui with a stunning sunrise viewpoint, sub-tropical rainforests, and rare endemic species like the silversword plant and nene goose."
+            },
+            {
+                id: 30,
+                name: "Hawaiʻi Volcanoes",
+                location: "Hawaii",
+                lat: 19.38,
+                lng: -155.20,
+                dateEstablished: "August 1, 1916",
+                area: "325,605.83 acres (1,317.7 km²)",
+                visitors: 1262747,
+                image: "https://www.nps.gov/common/uploads/structured_data/DB1AA9A9-DDAE-CF83-7EDB42B91684D801.jpg",
+                description: "Encompasses two active volcanoes: Kīlauea and Mauna Loa. Provides scientists insight into the birth of the Hawaiian Islands and visitors dramatic views of volcanic craters, steam vents, and flowing lava."
+            },
+            {
+                id: 31,
+                name: "Hot Springs",
+                location: "Arkansas",
+                lat: 34.51,
+                lng: -93.05,
+                dateEstablished: "March 4, 1921",
+                area: "5,554.15 acres (22.5 km²)",
+                visitors: 2656318,
+                image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRJ3N6L88yf9d3D9_sMjRfM14BcxHBm2BCI8Zz8oeLtFIMLwvZmC6VOBg&s=10",
+                description: "The oldest area in the National Park System, centered around natural thermal waters flowing from the Ouachita Mountains into historic Bathhouse Row."
+            },
+            {
+                id: 32,
+                name: "Indiana Dunes",
+                location: "Indiana",
+                lat: 41.65,
+                lng: -87.05,
+                dateEstablished: "February 15, 2019",
+                area: "15,349.08 acres (62.1 km²)",
+                visitors: 3177718,
+                image: "https://www.nps.gov/common/uploads/structured_data/9253EDFB-AAFD-E111-B985CD2747F5C48F.jpg",
+                description: "Spans 15 miles of the southern shore of Lake Michigan, featuring massive sand dunes, rugged blowouts, wetlands, prairies, and rich biodiversity."
+            },
+            {
+                id: 33,
+                name: "Isle Royale",
+                location: "Michigan",
+                lat: 48.10,
+                lng: -88.55,
+                dateEstablished: "April 3, 1931",
+                area: "571,790.30 acres (2,314.0 km²)",
+                visitors: 25844,
+                image: "https://www.nps.gov/common/uploads/cropped_image/primary/D98A72E5-A74D-2738-B8DD9AFA9F390844.jpg?width=1600&quality=90&mode=crop",
+                description: "A rugged, isolated island cluster in Lake Superior, accessible only by boat or seaplane. Famous for its pristine wilderness, wolf-moose predator-prey dynamics, and tranquil lakes."
+            },
+            {
+                id: 34,
+                name: "Joshua Tree",
+                location: "California",
+                lat: 33.79,
+                lng: -115.90,
+                dateEstablished: "October 31, 1994",
+                area: "795,156.41 acres (3,217.9 km²)",
+                visitors: 3064400,
+                image: "https://www.nps.gov/common/uploads/structured_data/306D0D93-9CCA-76E1-AD48268F8D7A7E3E.jpg",
+                description: "Encompasses two distinct desert ecosystems, the Mojave and the Colorado deserts, characterized by rugged rock formations, stark desert landscapes, and the iconic Yucca brevifolia (Joshua tree)."
+            },
+            {
+                id: 35,
+                name: "Katmai",
+                location: "Alaska",
+                lat: 58.50,
+                lng: -155.00,
+                dateEstablished: "December 2, 1980",
+                area: "4,093,077.21 acres (16,564.1 km²)",
+                visitors: 33763,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C7A32DB-1DD8-B71B-0B37F66E9D0832AF.jpg",
+                description: "Celebrated for its brown bears feeding on salmon at Brooks Falls, active volcanoes, and the Valley of Ten Thousand Smokes, formed by the massive 1912 Novarupta eruption."
+            },
+            {
+                id: 36,
+                name: "Kenai Fjords",
+                location: "Alaska",
+                lat: 59.92,
+                lng: -149.65,
+                dateEstablished: "December 2, 1980",
+                area: "669,982.99 acres (2,711.3 km²)",
+                visitors: 411782,
+                image: "https://www.nps.gov/common/uploads/structured_data/7135CE6E-FEBA-740C-B794409CA37C3741.jpg",
+                description: "Maintains the immense Harding Icefield, one of the major ice caps in the United States, feeding dozens of dramatic tidewater and valley glaciers flowing into the Gulf of Alaska."
+            },
+            {
+                id: 37,
+                name: "Kings Canyon",
+                location: "California",
+                lat: 36.80,
+                lng: -118.55,
+                dateEstablished: "March 4, 1940",
+                area: "461,901.20 acres (1,869.3 km²)",
+                visitors: 563481,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C7A250B-1DD8-B71B-0BCF61A89A8B2970.jpg",
+                description: "Home to giant sequoia groves, including the massive General Grant Tree, deep granite canyons carved by glaciers, and roaring whitewater rivers."
+            },
+            {
+                id: 38,
+                name: "Kobuk Valley",
+                location: "Alaska",
+                lat: 67.55,
+                lng: -159.28,
+                dateEstablished: "December 2, 1980",
+                area: "1,750,716.16 acres (7,084.9 km²)",
+                visitors: 16945,
+                image: "https://www.nps.gov/common/uploads/structured_data/377B8B80-02A0-BBF9-6393E8D9D0890226.jpg",
+                description: "Features the Great Kobuk Sand Dunes, an active arctic sand dune field, along with major caribou migration paths and ancient cultural sites."
+            },
+            {
+                id: 39,
+                name: "Lake Clark",
+                location: "Alaska",
+                lat: 60.97,
+                lng: -153.42,
+                dateEstablished: "December 2, 1980",
+                area: "2,619,733.21 acres (10,601.7 km²)",
+                visitors: 18189,
+                image: "https://www.nps.gov/lacl/images/LACL_2018_LakeClark_TiaVaughn.jpg",
+                description: "A scenic wilderness of jagged mountains, smoking volcanoes, turquoise lakes, rushing rivers, and pristine coastal ecosystems in southwestern Alaska."
+            },
+            {
+                id: 40,
+                name: "Lassen Volcanic",
+                location: "California",
+                lat: 40.49,
+                lng: -121.51,
+                dateEstablished: "August 9, 1916",
+                area: "106,452.85 acres (430.8 km²)",
+                visitors: 359638,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C873811-1DD8-B71B-0B9C62ED8E12E7B5.jpg",
+                description: "Contains all four types of volcanoes (shield, cinder cone, stratovolcano, and plug dome), along with hydrothermal areas like Bumpass Hell featuring boiling mud pots and steam vents."
+            },
+            {
+                id: 41,
+                name: "Mammoth Cave",
+                location: "Kentucky",
+                lat: 37.18,
+                lng: -86.10,
+                dateEstablished: "July 1, 1941",
+                area: "52,830.19 acres (213.8 km²)",
+                visitors: 515358,
+                image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRK7Rz3cAz5kXCfCW7qTKA4YFYiso1l0GBcWwXy3kYYfoteBG4yM3hXWrke&s=10",
+                description: "Home to the world's longest known cave system, with over 400 surveyed miles of subterranean passageways, limestone labyrinths, and rich underground ecosystems."
+            },
+            {
+                id: 42,
+                name: "Mesa Verde",
+                location: "Colorado",
+                lat: 37.18,
+                lng: -108.49,
+                dateEstablished: "June 29, 1906",
+                area: "52,485.17 acres (212.4 km²)",
+                visitors: 544075,
+                image: "https://upload.wikimedia.org/wikipedia/commons/8/83/Cliff_Palace-Colorado-Mesa_Verde_NP.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Protects some of the best-preserved Ancestral Puebloan archaeological sites in the United States, including spectacular cliff dwellings built into canyon walls."
+            },
+            {
+                id: 43,
+                name: "Mount Rainier",
+                location: "Washington",
+                lat: 46.85,
+                lng: -121.75,
+                dateEstablished: "March 2, 1899",
+                area: "235,625.00 acres (953.5 km²)",
+                visitors: 1617013,
+                image: "https://www.nps.gov/common/uploads/structured_data/49F34094-B893-7DD6-5AE0F0220724B0EF.jpg",
+                description: "Centered around Mount Rainier, an active stratovolcano and the most glaciated peak in the contiguous US. Surrounded by subalpine wildflower meadows and old-growth forests."
+            },
+            {
+                id: 44,
+                name: "National Park of American Samoa",
+                location: "American Samoa",
+                lat: -14.25,
+                lng: -170.68,
+                dateEstablished: "October 31, 1988",
+                area: "8,256.67 acres (33.4 km²)",
+                visitors: 8495,
+                image: "https://upload.wikimedia.org/wikipedia/commons/3/3c/Pola_Islands_Tutuila_NPS.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Spans three islands protecting Samoan culture, tropical rainforests, coral reefs, and white sandy beaches."
+            },
+            {
+                id: 45,
+                name: "New River Gorge",
+                location: "West Virginia",
+                lat: 38.07,
+                lng: -81.08,
+                dateEstablished: "December 27, 2020",
+                area: "70,211.00 acres (284.1 km²)",
+                visitors: 1682720,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C7E8DAE-1DD8-B71B-0B9B0DDABB90EA30.jpg",
+                description: "Protects a rugged, whitewater river canyon rich in Appalachian history, famous for the iconic New River Gorge Bridge and world-class rock climbing."
+            },
+            {
+                id: 46,
+                name: "North Cascades",
+                location: "Washington",
+                lat: 48.70,
+                lng: -121.20,
+                dateEstablished: "October 2, 1968",
+                area: "504,781.00 acres (2,042.8 km²)",
+                visitors: 40369,
+                image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Cascade_Pass_and_Pelton_Basin.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "A breathtaking alpine wonderland of jagged peaks, deep valleys, cascading waterfalls, and over 300 glaciers in the Pacific Northwest."
+            },
+            {
+                id: 47,
+                name: "Olympic",
+                location: "Washington",
+                lat: 47.97,
+                lng: -123.50,
+                dateEstablished: "June 29, 1938",
+                area: "922,649.27 acres (3,733.8 km²)",
+                visitors: 2432971,
+                image: "https://upload.wikimedia.org/wikipedia/commons/a/a8/Cedar_Creek_Abbey_Island_Ruby_Beach.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Showcases remarkable ecological diversity, ranging from Pacific coastline beaches and lush temperate rainforests to the glacier-clad peaks of the Olympic Mountains."
+            },
+            {
+                id: 48,
+                name: "Petrified Forest",
+                location: "Arizona",
+                lat: 35.07,
+                lng: -109.78,
+                dateEstablished: "December 9, 1962",
+                area: "221,390.21 acres (895.9 km²)",
+                visitors: 505274,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C85C078-1DD8-B71B-0BD76F126AAEA9B3.jpg",
+                description: "Famous for its vast deposits of petrified wood dating back to the Late Triassic period, alongside colorful badlands and historic petroglyphs."
+            },
+            {
+                id: 49,
+                name: "Pinnacles",
+                location: "California",
+                lat: 36.48,
+                lng: -121.16,
+                dateEstablished: "January 10, 2013",
+                area: "26,606.02 acres (107.7 km²)",
+                visitors: 348857,
+                image: "https://www.nps.gov/pinn/planyourvisit/images/Lake-Bear-Gulch_Volodymyr_adobe.jpeg",
+                description: "Named for the eroded remnants of an extinct volcano forming massive rock spires and talus caves. Important sanctuary for the endangered California condor."
+            },
+            {
+                id: 50,
+                name: "Redwood",
+                location: "California",
+                lat: 41.30,
+                lng: -124.00,
+                dateEstablished: "October 2, 1968",
+                area: "139,994.49 acres (566.5 km²)",
+                visitors: 456743,
+                image: "https://upload.wikimedia.org/wikipedia/commons/d/de/Redwood_National_Park%2C_fog_in_the_forest.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Protects nearly half of all remaining coast redwoods, the tallest trees on Earth, along with magnificent coastal prairie, rivers, and oak woodlands."
+            },
+            {
+                id: 51,
+                name: "Rocky Mountain",
+                location: "Colorado",
+                lat: 40.40,
+                lng: -105.58,
+                dateEstablished: "January 26, 1915",
+                area: "265,849.62 acres (1,075.9 km²)",
+                visitors: 4300487,
+                image: "https://www.nps.gov/common/uploads/structured_data/8824D3C2-F84D-A622-C2DE87AC4B9A8BC9.jpg",
+                description: "Encompasses majestic mountain environments with soaring peaks, alpine tundra, sparkling lakes, and abundant wildlife including bighorn sheep and elk."
+            },
+            {
+                id: 52,
+                name: "Saguaro",
+                location: "Arizona",
+                lat: 32.25,
+                lng: -110.75,
+                dateEstablished: "October 14, 1994",
+                area: "92,291.68 acres (373.5 km²)",
+                visitors: 1007803,
+                image: "https://upload.wikimedia.org/wikipedia/commons/b/b4/Saguaro_Sunset.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Protects majestic Saguaro cactus forests framing the Tucson mountains in the Sonoran Desert, alongside rich desert flora and fauna."
+            },
+            {
+                id: 53,
+                name: "Sequoia",
+                location: "California",
+                lat: 36.43,
+                lng: -118.68,
+                dateEstablished: "September 25, 1890",
+                area: "404,063.14 acres (1,635.2 km²)",
+                visitors: 1059543,
+                image: "https://www.nps.gov/common/uploads/grid_builder/seki/crop1_1/2C48A88A-96F3-C894-F955487F1650B3B5.jpg?width=640&quality=80&mode=crop&format=webp",
+                description: "Home to some of the largest trees on Earth, including the colossal General Sherman tree, towering granite monoliths, and deep subterranean caves."
+            },
+            {
+                id: 54,
+                name: "Shenandoah",
+                location: "Virginia",
+                lat: 38.53,
+                lng: -78.35,
+                dateEstablished: "December 26, 1935",
+                area: "200,146.06 acres (810.0 km²)",
+                visitors: 1587293,
+                image: "https://upload.wikimedia.org/wikipedia/commons/1/10/Skyline_Drive_in_the_Fall_%2821852619608%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Encompasses the scenic ridge of the Blue Ridge Mountains in Virginia, traversed by the famous Skyline Drive with panoramic views of the Shenandoah Valley."
+            },
+            {
+                id: 55,
+                name: "Theodore Roosevelt",
+                location: "North Dakota",
+                lat: 46.97,
+                lng: -103.45,
+                dateEstablished: "November 10, 1978",
+                area: "70,446.89 acres (285.1 km²)",
+                visitors: 763378,
+                image: "https://www.nps.gov/thro/planyourvisit/images/Scenic-Drives-Jessica-Kane-NPS.jpg",
+                description: "Rugged badlands along the Little Missouri River where President Theodore Roosevelt ran a cattle ranch, rich in bison, wild horses, and prairie wildlife."
+            },
+            {
+                id: 56,
+                name: "Virgin Islands",
+                location: "U.S. Virgin Islands",
+                lat: 18.33,
+                lng: -64.73,
+                dateEstablished: "August 2, 1956",
+                area: "15,052.33 acres (60.9 km²)",
+                visitors: 320499,
+                image: "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/20/St_John_Trunk_Bay_3.jpg/1280px-St_John_Trunk_Bay_3.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+                description: "Covers over half of Saint John island and offshore waters, protecting pristine tropical beaches, coral reefs, mangrove shores, and historic sugar plantation ruins."
+            },
+            {
+                id: 57,
+                name: "Voyageurs",
+                location: "Minnesota",
+                lat: 48.50,
+                lng: -92.88,
+                dateEstablished: "April 8, 1975",
+                area: "218,222.34 acres (883.1 km²)",
+                visitors: 247945,
+                image: "https://www.nps.gov/common/uploads/structured_data/31EDB5D6-FA28-880B-80068EB62E6C86CC.jpg",
+                description: "A water-based wonderland of interconnected lakes, rocky islands, and boreal forests along the Canadian border, steeped in the history of French-Canadian fur traders."
+            },
+            {
+                id: 58,
+                name: "White Sands",
+                location: "New Mexico",
+                lat: 32.78,
+                lng: -106.17,
+                dateEstablished: "December 20, 2019",
+                area: "146,344.31 acres (592.2 km²)",
+                visitors: 795431,
+                image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRXVEApjJ54GYQRlFtINIKn2FbGJuugehRp4ZEj8yIlGE1eQOqpuda-L23q&s=10",
+                description: "Encompasses the southern heart of a massive field of rare white gypsum sand dunes in the Tularosa Basin of New Mexico."
+            },
+            {
+                id: 59,
+                name: "Wind Cave",
+                location: "South Dakota",
+                lat: 43.57,
+                lng: -103.48,
+                dateEstablished: "January 9, 1903",
+                area: "33,970.84 acres (137.5 km²)",
+                visitors: 609282,
+                image: "https://upload.wikimedia.org/wikipedia/commons/1/1c/Skyway_Lake%2C_stalactites%2C_Wind_Cave.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "One of the world's longest and most complex caves, noted for its rare boxwork calcite formations, accompanied by expansive mixed-grass prairies above ground."
+            },
+            {
+                id: 60,
+                name: "Wrangell-St. Elias",
+                location: "Alaska",
+                lat: 61.50,
+                lng: -142.00,
+                dateEstablished: "December 2, 1980",
+                area: "8,323,146.48 acres (33,682.6 km²)",
+                visitors: 50193,
+                image: "https://www.nps.gov/common/uploads/structured_data/3C7AB124-1DD8-B71B-0B224A3B96A7304E.jpg",
+                description: "The largest national park in the United States, an immense mountain wilderness containing North America's greatest concentration of glaciers and towering peaks."
+            },
+            {
+                id: 61,
+                name: "Yellowstone",
+                location: "Wyoming, Montana, Idaho",
+                lat: 44.60,
+                lng: -110.50,
+                dateEstablished: "March 1, 1872",
+                area: "2,219,791.07 acres (8,983.2 km²)",
+                visitors: 3290242,
+                image: "https://media.cntraveler.com/photos/6185465b62de01ff927a2456/16:9/w_2560%2Cc_limit/Yellowstone_Grand%2520Prismatic%2520Spring_GettyImages-667781269.jpg",
+                description: "Widely held to be the first national park in the world. Famous for its geothermal wonders including Old Faithful, dramatic canyons, alpine rivers, and abundant wildlife like bison and grizzly bears."
+            },
+            {
+                id: 62,
+                name: "Yosemite",
+                location: "California",
+                lat: 37.83,
+                lng: -119.50,
+                dateEstablished: "October 1, 1890",
+                area: "761,747.50 acres (3,082.7 km²)",
+                visitors: 3667550,
+                image: "https://upload.wikimedia.org/wikipedia/commons/e/ea/Half_Dome_with_Eastern_Yosemite_Valley_%2850MP%29.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+                description: "Internationally recognized for its spectacular granite cliffs, waterfalls, clear streams, giant sequoia groves, and rich biological diversity."
+            },
+            {
+                id: 63,
+                name: "Zion",
+                location: "Utah",
+                lat: 37.30,
+                lng: -113.05,
+                dateEstablished: "November 19, 1919",
+                area: "147,242.66 acres (595.9 km²)",
+                visitors: 4622480,
+                image: "https://media.zion.travel/cdn-cgi/image/width=1600,quality=80,format=auto,fit=cover/https://media.zion.travel/uploads/8f2405a9-d777-4f4a-a58e-4858266a39c2-zion-travel-west-temple-towers-of-the-virgin-best-.jpg",
+                description: "A dramatic nature preserve distinguished by steep red sandstone cliffs, deep slot canyons like the Narrows, and hanging gardens along the Virgin River."
+            }
+        ];
+
+        // Initialize Map centered on US
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([39.8283, -98.5795], 4);
+
+        // Add custom zoom control to top-right
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Marker Cluster Group
+        const markersCluster = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true
+        });
+        map.addLayer(markersCluster);
+
+        let markersMap = new Map(); // Park ID -> Marker
+
+        // DOM Elements
+        const parksListEl = document.getElementById('parks-list');
+        const searchInputEl = document.getElementById('search-input');
+        const stateFilterEl = document.getElementById('state-filter');
+        const resetFiltersBtn = document.getElementById('reset-filters');
+        const parkCountBadgeEl = document.getElementById('park-count-badge');
+        const detailDrawerEl = document.getElementById('detail-drawer');
+        const drawerContentEl = document.getElementById('drawer-content');
+        const closeDrawerBtn = document.getElementById('close-drawer');
+        const toggleSidebarMobileBtn = document.getElementById('toggle-sidebar-mobile');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+        const sidebarEl = document.getElementById('sidebar');
+        const backdropEl = document.getElementById('backdrop');
+
+        // Populate State Filter options
+        function initStatesFilter() {
+            const statesSet = new Set();
+            parksData.forEach(park => {
+                park.location.split(',').forEach(s => {
+                    statesSet.add(s.trim());
+                });
+            });
+            const sortedStates = Array.from(statesSet).sort();
+            sortedStates.forEach(state => {
+                const opt = document.createElement('option');
+                opt.value = state;
+                opt.textContent = state;
+                stateFilterEl.appendChild(opt);
+            });
+        }
+
+        // Render Parks
+        function renderParks(filteredParks) {
+            parksListEl.innerHTML = '';
+            markersCluster.clearLayers();
+            markersMap.clear();
+
+            parkCountBadgeEl.textContent = `${filteredParks.length} Parks Found`;
+
+            if (filteredParks.length === 0) {
+                parksListEl.innerHTML = `
+                    <div class="text-center py-12 text-[#C2AA81]">
+                        <i class="fa-solid fa-mountain-sun text-3xl mb-2 opacity-50"></i>
+                        <p class="text-sm">No national parks found matching your criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredParks.forEach(park => {
+                // 1. Create List Card
+                const card = document.createElement('div');
+                card.className = "bg-[#303032]/80 hover:bg-[#303032] border border-[#223C31] hover:border-[#DFA237]/60 rounded-xl p-4 cursor-pointer transition shadow-sm group";
+                card.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <h3 class="font-semibold text-[#DDDCCB] group-hover:text-[#DFA237] transition font-bitter-bold">${park.name} National Park</h3>
+                        <span class="text-xs font-medium bg-[#223C31] text-[#C2AA81] px-2 py-0.5 rounded border border-[#303032]">${park.location}</span>
+                    </div>
+                    <p class="text-xs text-[#C2AA81]/80 mt-2 line-clamp-2">${park.description}</p>
+                    <div class="mt-3 flex items-center justify-between text-xs text-[#C2AA81] pt-2 border-t border-[#223C31]">
+                        <span><i class="fa-solid fa-users text-[#DFA237] mr-1"></i> ${park.visitors.toLocaleString()} visitors</span>
+                        <span class="text-[#DFA237] font-medium group-hover:underline">Explore <i class="fa-solid fa-arrow-right text-[10px] ml-0.5"></i></span>
+                    </div>
+                `;
+                card.addEventListener('click', () => {
+                    selectPark(park);
+                    if (window.innerWidth < 768) {
+                        toggleSidebar(false);
+                    }
+                });
+                parksListEl.appendChild(card);
+
+                // 2. Create Leaflet Marker with Custom Icon
+                const customIcon = L.divIcon({
+                    className: 'custom-map-marker',
+                    html: `<div class="w-8 h-8 rounded-full bg-[#576F3F] text-[#DDDCCB] flex items-center justify-center shadow-lg border-2 border-[#DDDCCB] hover:scale-110 transition cursor-pointer"><i class="fa-solid fa-tree text-xs"></i></div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                const marker = L.marker([park.lat, park.lng], { icon: customIcon });
+                marker.on('click', () => {
+                    selectPark(park);
+                });
+                
+                markersCluster.addLayer(marker);
+                markersMap.set(park.id, marker);
+            });
+        }
+
+        // Select Park & Show Detail Drawer
+        function selectPark(park) {
+            map.flyTo([park.lat, park.lng], 9, {
+                animate: true,
+                duration: 1.2
+            });
+
+            drawerContentEl.innerHTML = `
+                <img
+                    src="${park.image}"
+                    alt="${park.name}"
+                    class="w-full h-56 object-cover rounded-xl"
+                    onerror="this.style.display='none'"
+                >
+                <div>
+                    <h2 class="text-2xl font-bold text-[#DDDCCB] font-bitter-bold">${park.name} National Park</h2>
+                    <p class="text-sm text-[#DFA237] font-medium mt-1 flex items-center gap-1.5"><i class="fa-solid fa-location-dot"></i> ${park.location}</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-[#303032] p-3.5 rounded-xl border border-[#223C31]">
+                        <span class="text-xs text-[#C2AA81] block"><i class="fa-solid fa-calendar-days text-[#DFA237] mr-1"></i> Established</span>
+                        <span class="text-sm font-semibold text-[#DDDCCB] mt-1 block">${park.dateEstablished}</span>
+                    </div>
+                    <div class="bg-[#303032] p-3.5 rounded-xl border border-[#223C31]">
+                        <span class="text-xs text-[#C2AA81] block"><i class="fa-solid fa-users text-[#DFA237] mr-1"></i> Annual Visitors</span>
+                        <span class="text-sm font-semibold text-[#DDDCCB] mt-1 block">${park.visitors.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <div class="bg-[#303032] p-3.5 rounded-xl border border-[#223C31]">
+                    <span class="text-xs text-[#C2AA81] block"><i class="fa-solid fa-ruler-combined text-[#DFA237] mr-1"></i> Area Size</span>
+                    <span class="text-sm font-semibold text-[#DDDCCB] mt-1 block">${park.area}</span>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold text-[#C2AA81] uppercase tracking-wider mb-2">About the Park</h3>
+                    <p class="text-sm text-[#DDDCCB] leading-relaxed bg-[#303032] p-4 rounded-xl border border-[#223C31]">${park.description}</p>
+                </div>
+
+                <div class="pt-2">
+                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(park.name + ' National Park ' + park.location)}" target="_blank" class="w-full bg-[#576F3F] hover:bg-[#804E2D] text-[#DDDCCB] font-medium py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg">
+                        <i class="fa-solid fa-map-location-dot"></i> Open in Google Maps
+                    </a>
+                </div>
+            `;
+
+            detailDrawerEl.classList.remove('translate-x-full');
+        }
+
+        // Filter logic
+        function filterParks() {
+            const query = searchInputEl.value.toLowerCase().trim();
+            const selectedState = stateFilterEl.value;
+
+            const filtered = parksData.filter(park => {
+                const matchesQuery = park.name.toLowerCase().includes(query) || 
+                                     park.description.toLowerCase().includes(query) ||
+                                     park.location.toLowerCase().includes(query);
+                const matchesState = selectedState === "" || park.location.includes(selectedState);
+                return matchesQuery && matchesState;
+            });
+
+            renderParks(filtered);
+        }
+
+        searchInputEl.addEventListener('input', filterParks);
+        stateFilterEl.addEventListener('change', filterParks);
+        resetFiltersBtn.addEventListener('click', () => {
+            searchInputEl.value = '';
+            stateFilterEl.value = '';
+            filterParks();
+        });
+
+        // Mobile Sidebar Toggle
+        function toggleSidebar(show) {
+            if (show) {
+                sidebarEl.classList.remove('-translate-x-full');
+                backdropEl.classList.remove('hidden');
+            } else {
+                sidebarEl.classList.add('-translate-x-full');
+                backdropEl.classList.add('hidden');
+            }
+        }
+
+        toggleSidebarMobileBtn.addEventListener('click', () => toggleSidebar(true));
+        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+        backdropEl.addEventListener('click', () => toggleSidebar(false));
+
+        closeDrawerBtn.addEventListener('click', () => {
+            detailDrawerEl.classList.add('translate-x-full');
+        });
+
+        window.onload = function () {
+            initStatesFilter();
+            renderParks(parksData);
+        };
+    </script>
+</body>
+</html>
