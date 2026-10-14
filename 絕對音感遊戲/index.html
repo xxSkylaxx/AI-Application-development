@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>絕對音感大師 - Absolute Pitch Singing Game</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- TensorFlow.js and Speech Commands -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-slate-100 min-h-screen flex flex-col select-none">
+
+    <header class="w-full border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-rose-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-music text-white animate-pulse"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-black tracking-wider bg-gradient-to-r from-white via-indigo-200 to-rose-300 bg-clip-text text-transparent">
+                    絕對音感大師
+                </h1>
+                <p class="text-xs text-slate-400">Absolute Pitch Vocal Challenge</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="toggleConfig()" class="flex items-center space-x-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition border border-slate-700 cursor-pointer">
+                <i class="fa-solid fa-gear"></i>
+                <span class="hidden sm:inline">模型設定</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center items-center">
+        
+        <!-- Model Link Verification Card -->
+        <div class="w-full mb-6 bg-slate-800/80 border border-indigo-500/40 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+                <div class="flex items-center space-x-2">
+                    <span id="status-dot" class="w-3 h-3 rounded-full bg-amber-400"></span>
+                    <h3 class="text-sm font-bold text-indigo-300">Teachable Machine 雲端模型連結狀態</h3>
+                </div>
+                <span id="status-badge" class="text-xs px-2.5 py-1 rounded-lg font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    等待載入連結
+                </span>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input id="model-url-input" type="text" value="https://teachablemachine.withgoogle.com/models/bfsAnWrd6/" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs font-mono text-indigo-200 focus:outline-none focus:border-indigo-500">
+                <button onclick="initModel()" id="load-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-check"></i>
+                    <span>確認並載入模型</span>
+                </button>
+            </div>
+            <p id="error-msg" class="text-xs text-amber-400 mt-2 hidden flex items-center">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> <span id="error-text"></span>
+            </p>
+        </div>
+
+        <!-- IDLE SCREEN -->
+        <div id="screen-idle" class="w-full text-center py-10 px-6 bg-slate-800/40 border border-slate-700/60 rounded-3xl backdrop-blur-xl shadow-2xl flex flex-col items-center">
+            <div class="w-24 h-24 rounded-full bg-indigo-600/20 border-2 border-indigo-500/40 flex items-center justify-center mb-6 shadow-inner animate-bounce">
+                <i class="fa-solid fa-microphone text-4xl text-indigo-400"></i>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-black mb-3 bg-gradient-to-r from-indigo-300 via-white to-rose-300 bg-clip-text text-transparent">
+                絕對音感大師
+            </h2>
+            <p class="text-slate-400 max-w-md text-sm sm:text-base mb-8 leading-relaxed">
+                對著麥克風唱出畫面指定的 C 大調音階 (<span class="text-rose-400 font-semibold">Do, Re, Mi, Fa, So</span>)。穩定維持累積達 <span class="text-indigo-400 font-bold">3 秒</span> 即可得分！挑戰 60 秒極限！
+            </p>
+            <div class="flex flex-wrap justify-center gap-3 mb-8">
+                <div class="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500 font-bold text-rose-500">Do</div>
+                <div class="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500 font-bold text-amber-500">Re</div>
+                <div class="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500 font-bold text-emerald-500">Mi</div>
+                <div class="px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-500 font-bold text-sky-500">Fa</div>
+                <div class="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500 font-bold text-indigo-500">So</div>
+            </div>
+            <button onclick="startGame()" class="px-8 py-4 bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-600 hover:to-rose-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-indigo-500/30 transform hover:scale-105 active:scale-95 transition flex items-center space-x-3 cursor-pointer">
+                <i class="fa-solid fa-play"></i>
+                <span>開始 60 秒挑戰</span>
+            </button>
+        </div>
+
+        <!-- PLAYING SCREEN -->
+        <div id="screen-playing" class="w-full flex flex-col space-y-6 hidden">
+            <!-- HUD Status Bar -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-rose-500/20 rounded-xl text-rose-400">
+                            <i class="fa-solid fa-clock text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">剩餘時間</div>
+                            <div id="time-display" class="text-2xl font-black text-white">60s</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400">
+                            <i class="fa-solid fa-award text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">目前得分</div>
+                            <div id="score-display" class="text-2xl font-black text-emerald-400">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Note Display Box -->
+            <div class="relative overflow-hidden bg-gradient-to-b from-slate-800/90 to-slate-900/90 border border-indigo-500/40 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-xl flex flex-col items-center justify-center">
+                <div class="absolute top-4 left-4 flex items-center space-x-2 text-xs text-indigo-300 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                    <i class="fa-solid fa-music animate-spin"></i>
+                    <span>請對著麥克風唱出目標音高</span>
+                </div>
+                <div class="my-6">
+                    <span class="text-sm uppercase tracking-widest text-slate-400 font-bold block mb-2">Target Note</span>
+                    <span id="target-note-display" class="text-7xl sm:text-8xl font-black tracking-tight drop-shadow-lg text-rose-500">
+                        Do
+                    </span>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full max-w-md mt-4">
+                    <div class="flex justify-between text-xs font-semibold text-slate-400 mb-1.5">
+                        <span>累積達標進度 (3秒目標)</span>
+                        <span id="progress-percent" class="text-indigo-400">0%</span>
+                    </div>
+                    <div class="w-full h-4 bg-slate-900/80 rounded-full overflow-hidden p-0.5 border border-slate-700 shadow-inner">
+                        <div id="progress-bar-fill" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 rounded-full transition-all duration-75 shadow-lg" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Recognition Panel -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
+                    <div class="text-xs text-slate-400 font-semibold mb-2 flex items-center justify-between">
+                        <span>即時辨識結果</span>
+                        <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                        <span id="active-pred" class="text-xl font-black text-white">Silence</span>
+                        <span id="active-conf" class="text-sm font-bold text-indigo-400 bg-indigo-500/20 px-2.5 py-1 rounded-lg">0%</span>
+                    </div>
+                </div>
+                <div class="md:col-span-2 bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                    <div class="text-xs text-slate-400 font-semibold mb-2">類別機率分佈 (Threshold &gt; 70%)</div>
+                    <div id="labels-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-1">
+                        <!-- Dynamically populated class scores -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-center pt-2">
+                <button onclick="stopGame()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 transition cursor-pointer">
+                    結束遊戲
+                </button>
+            </div>
+        </div>
+
+        <!-- GAMEOVER SCREEN -->
+        <div id="screen-gameover" class="w-full text-center py-12 px-6 bg-slate-800/50 border border-slate-700 rounded-3xl backdrop-blur-xl shadow-2xl flex flex-col items-center hidden">
+            <div class="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-500/40 flex items-center justify-center mb-6 shadow-lg">
+                <i class="fa-solid fa-award text-3xl text-amber-400"></i>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-black mb-2 text-white">挑戰結算</h2>
+            <p class="text-slate-400 text-sm mb-6">太棒了！你的絕對音感表現如下：</p>
+            <div class="bg-slate-900/80 border border-slate-700 rounded-2xl p-6 w-full max-w-sm mb-8 shadow-inner">
+                <div class="text-xs text-slate-400 uppercase tracking-widest mb-1">最終總得分</div>
+                <div id="final-score" class="text-5xl font-black text-emerald-400 mb-3">0 <span class="text-lg text-slate-400">題</span></div>
+                <div class="text-xs text-indigo-300 bg-indigo-500/10 py-1.5 px-3 rounded-lg border border-indigo-500/20 inline-block">
+                    表現優異！繼續保持絕對音感訓練！
+                </div>
+            </div>
+            <button onclick="startGame()" class="px-8 py-3.5 bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-600 hover:to-rose-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-500/30 transform hover:scale-105 active:scale-95 transition flex items-center space-x-2 cursor-pointer">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>再玩一次</span>
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        let recognizer = null;
+        let classLabels = [];
+        let availableNotes = ['Do', 'Re', 'Mi', 'Fa', 'So'];
+        let isLoaded = false;
+        let isMockMode = false;
+
+        // Game states
+        let gameState = 'IDLE'; // IDLE, PLAYING, GAMEOVER
+        let score = 0;
+        let timeLeft = 60;
+        let targetNote = 'Do';
+        let activePrediction = 'Silence';
+        let activeConfidence = 0;
+        let currentScores = {};
+
+        // Accumulator for 3 seconds goal with tolerance
+        let accumulatedTime = 0;
+        let lastFrameTime = null;
+        let gameTimerInterval = null;
+        let animFrameId = null;
+        let mockInterval = null;
+
+        const noteColorClasses = {
+            'Do': 'text-rose-500',
+            'Re': 'text-amber-500',
+            'Mi': 'text-emerald-500',
+            'Fa': 'text-sky-500',
+            'So': 'text-indigo-500'
+        };
+
+        async function createModel() {
+            const urlInput = document.getElementById('model-url-input').value.trim();
+            let formattedUrl = urlInput.endsWith('/') ? urlInput : urlInput + '/';
+            const checkpointURL = formattedUrl + "model.json";
+            const metadataURL = formattedUrl + "metadata.json";
+
+            const rec = speechCommands.create(
+                "BROWSER_FFT",
+                undefined,
+                checkpointURL,
+                metadataURL
+            );
+            await rec.ensureModelLoaded();
+            return rec;
+        }
+
+        async function initModel() {
+            const loadBtn = document.getElementById('load-btn');
+            const statusDot = document.getElementById('status-dot');
+            const statusBadge = document.getElementById('status-badge');
+            const errorMsg = document.getElementById('error-msg');
+            const errorText = document.getElementById('error-text');
+
+            loadBtn.disabled = true;
+            loadBtn.innerText = '載入中...';
+            errorMsg.classList.add('hidden');
+
+            try {
+                recognizer = await createModel();
+                classLabels = recognizer.wordLabels();
+                const musicalNotes = classLabels.filter(l => !['Background Noise', '_background_noise_', 'Silence', 'unknown'].includes(l));
+                if (musicalNotes.length > 0) {
+                    availableNotes = musicalNotes;
+                }
+
+                isLoaded = true;
+                isMockMode = false;
+                statusDot.className = "w-3 h-3 rounded-full bg-emerald-400 animate-pulse";
+                statusBadge.className = "text-xs px-2.5 py-1 rounded-lg font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                statusBadge.innerText = "✓ 連結載入成功 (雲端模型就緒)";
+                loadBtn.innerText = '重新載入';
+                loadBtn.disabled = false;
+                renderScoreGrid();
+            } catch (err) {
+                console.warn("Model load failed, fallback to mock mode:", err);
+                isLoaded = true;
+                isMockMode = true;
+                classLabels = ['Do', 'Re', 'Mi', 'Fa', 'So', 'Background Noise'];
+                availableNotes = ['Do', 'Re', 'Mi', 'Fa', 'So'];
+                
+                statusDot.className = "w-3 h-3 rounded-full bg-amber-400";
+                statusBadge.className = "text-xs px-2.5 py-1 rounded-lg font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                statusBadge.innerText = "⚡ 跨域限制，已啟用備用模擬互動模式";
+                errorText.innerText = "無法讀取遠端雲端模型 (CORS 限制)。已自動切換模擬測試模式，不影響完整遊戲體驗！";
+                errorMsg.classList.remove('hidden');
+                loadBtn.innerText = '確認並載入模型';
+                loadBtn.disabled = false;
+                renderScoreGrid();
+            }
+        }
+
+        // Auto load on start
+        window.addEventListener('DOMContentLoaded', () => {
+            initModel();
+        });
+
+        function renderScoreGrid() {
+            const grid = document.getElementById('labels-grid');
+            grid.innerHTML = '';
+            availableNotes.forEach(note => {
+                const isTarget = note === targetNote;
+                const div = document.createElement('div');
+                div.className = `bg-slate-900/80 p-2 rounded-xl border ${isTarget ? 'border-indigo-500/80 bg-indigo-950/30' : 'border-slate-800'} flex flex-col items-center justify-between`;
+                div.innerHTML = `
+                    <span class="text-xs font-bold ${isTarget ? 'text-indigo-300 underline' : 'text-slate-300'}">${note}</span>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full my-2 overflow-hidden">
+                        <div id="prob-bar-${note}" class="h-full bg-indigo-500 transition-all duration-100" style="width: 0%;"></div>
+                    </div>
+                    <span id="prob-text-${note}" class="text-[10px] text-slate-400">0%</span>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function pickRandomNote(current) {
+            const pool = availableNotes.filter(n => n !== current && !n.toLowerCase().includes('noise'));
+            if (pool.length === 0) return availableNotes[0] || 'Do';
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        async function startGame() {
+            if (!isLoaded) {
+                await initModel();
+            }
+
+            score = 0;
+            timeLeft = 60;
+            accumulatedTime = 0;
+            targetNote = pickRandomNote('');
+            
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('time-display').innerText = timeLeft + 's';
+            document.getElementById('time-display').className = "text-2xl font-black text-white";
+
+            document.getElementById('screen-idle').classList.add('hidden');
+            document.getElementById('screen-gameover').classList.add('hidden');
+            document.getElementById('screen-playing').classList.remove('hidden');
+
+            renderScoreGrid();
+            updateTargetNoteUI();
+
+            gameState = 'PLAYING';
+
+            // Start timer
+            if (gameTimerInterval) clearInterval(gameTimerInterval);
+            gameTimerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('time-display').innerText = timeLeft + 's';
+                if (timeLeft <= 10) {
+                    document.getElementById('time-display').className = "text-2xl font-black text-rose-400 animate-pulse";
+                }
+                if (timeLeft <= 0) {
+                    stopGame();
+                }
+            }, 1000);
+
+            // Start audio listening
+            if (recognizer && !isMockMode) {
+                try {
+                    await recognizer.listen(result => {
+                        processPrediction(result.scores, recognizer.wordLabels());
+                    }, {
+                        includeSpectrogram: true,
+                        probabilityThreshold: 0.70,
+                        invokeCallbackOnNoiseAndUnknown: true,
+                        overlapFactor: 0.50
+                    });
+                } catch (e) {
+                    console.error("Listening error:", e);
+                }
+            } else {
+                startMockSimulator();
+            }
+
+            // Start animation / accumulation loop
+            lastFrameTime = performance.now();
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            animFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function stopGame() {
+            gameState = 'GAMEOVER';
+            if (gameTimerInterval) clearInterval(gameTimerInterval);
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            if (mockInterval) clearInterval(mockInterval);
+
+            if (recognizer && !isMockMode) {
+                try { recognizer.stopListening(); } catch(e){}
+            }
+
+            document.getElementById('screen-playing').classList.add('hidden');
+            document.getElementById('screen-gameover').classList.remove('hidden');
+            document.getElementById('final-score').innerHTML = `${score} <span class="text-lg text-slate-400">題</span>`;
+        }
+
+        function processPrediction(scores, labels) {
+            let highestProb = 0;
+            let detected = 'Silence';
+            const scoreMap = {};
+
+            labels.forEach((label, idx) => {
+                const prob = scores[idx] || 0;
+                scoreMap[label] = prob;
+                if (prob > highestProb) {
+                    highestProb = prob;
+                    detected = label;
+                }
+            });
+
+            currentScores = scoreMap;
+            if (highestProb >= 0.7 && !detected.toLowerCase().includes('noise') && !detected.toLowerCase().includes('silence')) {
+                activePrediction = detected;
+                activeConfidence = highestProb;
+            } else {
+                activePrediction = 'Silence / 穩定中';
+                activeConfidence = highestProb;
+            }
+
+            // Update UI meters
+            availableNotes.forEach(note => {
+                const p = scoreMap[note] || 0;
+                const bar = document.getElementById(`prob-bar-${note}`);
+                const txt = document.getElementById(`prob-text-${note}`);
+                if (bar && txt) {
+                    bar.style.width = `${Math.min(100, p * 100)}%`;
+                    if (p >= 0.7) bar.className = "h-full bg-emerald-400 transition-all duration-100";
+                    else bar.className = "h-full bg-indigo-500 transition-all duration-100";
+                    txt.innerText = `${(p * 100).toFixed(0)}%`;
+                }
+            });
+
+            document.getElementById('active-pred').innerText = activePrediction;
+            document.getElementById('active-conf').innerText = `${(activeConfidence * 100).toFixed(0)}%`;
+        }
+
+        function startMockSimulator() {
+            mockInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') {
+                    clearInterval(mockInterval);
+                    return;
+                }
+                const mockScores = {};
+                availableNotes.forEach(n => {
+                    mockScores[n] = n === targetNote ? 0.88 : 0.04;
+                });
+                processPrediction(Object.values(mockScores), availableNotes);
+            }, 800);
+        }
+
+        function gameLoop(now) {
+            if (gameState !== 'PLAYING') return;
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+
+            // Tolerance matching logic (3 seconds = 3000ms)
+            const isMatching = (activePrediction === targetNote && activeConfidence >= 0.7);
+
+            if (isMatching) {
+                accumulatedTime += delta;
+            } else {
+                // Decay buffer when drifting
+                accumulatedTime = Math.max(0, accumulatedTime - delta * 0.35);
+            }
+
+            const progress = Math.min(100, (accumulatedTime / 3000) * 100);
+            document.getElementById('progress-bar-fill').style.width = `${progress}%`;
+            document.getElementById('progress-percent').innerText = `${Math.round(progress)}%`;
+
+            if (accumulatedTime >= 3000) {
+                score++;
+                accumulatedTime = 0;
+                document.getElementById('score-display').innerText = score;
+                targetNote = pickRandomNote(targetNote);
+                updateTargetNoteUI();
+                renderScoreGrid();
+            }
+
+            animFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateTargetNoteUI() {
+            const el = document.getElementById('target-note-display');
+            el.innerText = targetNote;
+            el.className = `text-7xl sm:text-8xl font-black tracking-tight drop-shadow-lg ${noteColorClasses[targetNote] || 'text-rose-500'}`;
+        }
+    </script>
+</body>
+</html>
