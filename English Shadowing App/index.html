@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Shadowing Sentence by Sentence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 預設主題：薄暮早晨 */
+            --c-c1: #1B4EF5;
+            --c-c2: #3874FF;
+            --c-c3: #5996FF;
+            --c-c4: #F4CEFF;
+            --header-text: #ffffff;
+            --badge-text: #1B4EF5;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* 動態主題套用樣式 */
+        .theme-header {
+            background-color: var(--c-c1);
+            color: var(--header-text);
+        }
+        .theme-subtitle {
+            color: var(--c-c4);
+        }
+        .theme-icon-bg {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: var(--header-text);
+        }
+        .theme-badge {
+            background-color: var(--c-c4);
+            color: var(--badge-text);
+            border-color: var(--c-c3);
+        }
+        .theme-icon {
+            color: var(--c-c2);
+        }
+        .theme-btn-primary {
+            background-color: var(--c-c2);
+            color: #ffffff;
+        }
+        .theme-btn-primary:hover {
+            background-color: var(--c-c1);
+        }
+        .theme-btn-secondary {
+            background-color: var(--c-c4);
+            color: var(--c-c1);
+            border-color: var(--c-c3);
+        }
+        .theme-btn-secondary:hover {
+            background-color: var(--c-c3);
+            color: #ffffff;
+        }
+        .theme-border-focus:focus {
+            border-color: var(--c-c2) !important;
+            box-shadow: 0 0 0 2px var(--c-c3) !important;
+        }
+        .theme-active-item {
+            background-color: var(--c-c4) !important;
+            border-color: var(--c-c2) !important;
+            color: var(--c-c1) !important;
+        }
+        .theme-active-badge {
+            background-color: var(--c-c2) !important;
+            color: #ffffff !important;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .recording-pulse {
+            animation: pulse-ring 1.5s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="theme-header shadow-md sticky top-0 z-50 transition-colors duration-300">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-2">
+            <div class="flex items-center space-x-3">
+                <div class="theme-icon-bg p-2 rounded-xl">
+                    <i class="fa-solid font-bold fa-microphone-lines text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">English Shadowing Sentence by Sentence</h1>
+                    <p class="text-xs theme-subtitle">英文跟讀練習App</p>
+                </div>
+            </div>
+
+            <!-- Header Controls: Theme Selection & Browser Alert -->
+            <div class="flex items-center gap-3">
+                <!-- Theme Selector Dropdown -->
+                <div class="flex items-center gap-1.5 bg-black/10 px-2.5 py-1.5 rounded-xl border border-white/20">
+                    <i class="fa-solid fa-palette text-xs opacity-90"></i>
+                    <select id="themeSelect" class="bg-transparent text-xs font-medium focus:outline-none cursor-pointer">
+                        <option value="ytred" selected class="text-slate-800">YouTube紅</option>
+                        <option value="morning" class="text-slate-800">薄暮早晨</option>
+                        <option value="flamingo" class="text-slate-800">紅鶴夏日</option>
+                        <option value="vintage" class="text-slate-800">復古藍調</option>
+                        <option value="sunset" class="text-slate-800">日落時分</option>
+                    </select>
+                </div>
+
+                <div id="browserAlert" class="hidden text-xs bg-amber-500 text-white px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>建議使用 Google Chrome 瀏覽器</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-5xl mx-auto px-4 py-6 w-full flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+
+        <!-- Left Column (50% width on md screens) -->
+        <section class="md:col-span-6 flex flex-col gap-4">
+            
+            <!-- YouTube Video Player Box -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col gap-3">
+                <div class="flex justify-between items-center">
+                    <label for="youtubeUrlInput" class="font-semibold text-slate-700 flex items-center gap-2">
+                        <i class="fa-brands fa-youtube text-red-600 text-lg"></i> YouTube影片播放器
+                    </label>
+                    <span class="text-xs text-slate-400">貼上影片網址</span>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="youtubeUrlInput" class="flex-1 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-sm transition" placeholder="例如：https://www.youtube.com/watch?v=... 或 shorts">
+                    <button id="loadYtBtn" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium py-2 px-4 rounded-xl transition text-sm flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-play"></i> 載入
+                    </button>
+                </div>
+                <!-- Responsive YouTube Embed Container -->
+                <div id="ytPlayerContainer" class="hidden relative w-full pt-[56.25%] bg-black rounded-xl overflow-hidden mt-1 shadow-inner">
+                    <iframe id="ytIframe" class="absolute top-0 left-0 w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                </div>
+            </div>
+
+            <!-- Side-by-side grid container for Transcript & Sentence List -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+                <!-- Text Import Box -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col gap-3 h-full">
+                    <div class="flex justify-between items-center">
+                        <label for="transcriptInput" class="font-semibold text-slate-700 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-file-lines theme-icon"></i> 匯入逐字稿
+                        </label>
+                    </div>
+
+                    <!-- Usage Hint Note -->
+                    <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100 flex flex-col gap-0.5">
+                        <span class="font-medium text-slate-600">您可以貼上：</span>
+                        <ul class="list-disc list-inside space-y-0.5 text-slate-500 pl-0.5">
+                            <li>1. YouTube影片逐字稿</li>
+                            <li>2. Podcast節目音檔逐字稿</li>
+                            <li>3. 任何跟讀英文內容</li>
+                        </ul>
+                    </div>
+
+                    <!-- YT Subtitle Helper Banner -->
+                    <div class="theme-badge border rounded-xl p-2.5 text-[11px] flex flex-col items-start gap-1.5">
+                        <div class="flex items-start gap-1.5 leading-tight">
+                            <i class="fa-solid fa-circle-info theme-icon mt-0.5 text-xs"></i>
+                            <span>可至外部網站貼上影片網址取得逐字稿。</span>
+                        </div>
+                        <a href="https://youtubetotranscript.com/" target="_blank" rel="noopener noreferrer" class="w-full text-center theme-btn-primary font-medium py-1 px-2 rounded-lg transition text-xs flex items-center justify-center gap-1 shadow-sm">
+                            <span>前往轉換</span>
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                        </a>
+                    </div>
+
+                    <textarea id="transcriptInput" rows="4" class="w-full p-2.5 border border-slate-200 rounded-xl theme-border-focus outline-none transition text-xs resize-none custom-scrollbar flex-1 min-h-[90px]" placeholder="請貼上英文逐字稿"></textarea>
+                    
+                    <div class="flex gap-1.5">
+                        <button id="parseBtn" class="flex-1 theme-btn-primary font-medium py-1.5 px-3 rounded-xl transition text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-scissors"></i> 逐字稿→句子
+                        </button>
+                        <button id="clearBtn" class="px-2.5 py-1.5 text-slate-500 hover:bg-slate-100 rounded-xl transition text-xs border border-slate-200" title="清空內容">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sentence List Box -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col h-full">
+                    <div class="flex justify-between items-center mb-2.5">
+                        <h2 class="font-semibold text-slate-700 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-list-ol theme-icon"></i> 句子清單 
+                        </h2>
+                        <span id="sentenceCounter" class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200 font-medium">0 句</span>
+                    </div>
+                    <div id="sentenceList" class="flex-1 overflow-y-auto max-h-[360px] space-y-1.5 pr-1 custom-scrollbar text-xs">
+                        <div class="text-center text-slate-400 py-10 flex flex-col items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-left text-xl opacity-40 hidden sm:block"></i>
+                            <i class="fa-solid fa-arrow-up text-xl opacity-40 sm:hidden"></i>
+                            <p class="text-xs">請在左側貼上文章並按下「逐字稿→句子」</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Right Column (50% width on md screens) -->
+        <section class="md:col-span-6 flex flex-col gap-4">
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col gap-6 h-full justify-between">
+                
+                <!-- Practice Header / Controls -->
+                <div class="flex flex-col gap-4">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
+                        <span id="currentStatus" class="text-xs font-semibold uppercase tracking-wider theme-badge px-2.5 py-1 rounded-md border">
+                            開始跟讀練習
+                        </span>
+                        
+                        <!-- Voice & Speed Settings Controls -->
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <!-- Accent Selection -->
+                            <label class="text-xs text-slate-500 flex items-center gap-1">
+                                <i class="fa-solid fa-earth-americas theme-icon"></i> 口音:
+                                <select id="voiceSelect" class="bg-slate-100 border border-slate-200 rounded-lg text-xs py-1 px-2 focus:outline-none theme-border-focus text-slate-700 font-medium max-w-[140px]">
+                                    <option value="">載入語音庫中...</option>
+                                </select>
+                            </label>
+
+                            <!-- Speed Selection -->
+                            <label class="text-xs text-slate-500 flex items-center gap-1">
+                                <i class="fa-solid fa-gauge-high theme-icon"></i> 語速:
+                                <select id="speedSelect" class="bg-slate-100 border border-slate-200 rounded-lg text-xs py-1 px-1.5 focus:outline-none theme-border-focus text-slate-700 font-medium">
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1.0" selected>1.0x</option>
+                                    <option value="1.25">1.25x</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Target Sentence Display -->
+                    <div>
+                        <span class="text-xs font-medium text-slate-400 block mb-1">練習句子:</span>
+                        <div id="targetSentenceDisplay" class="text-lg md:text-xl font-medium leading-relaxed text-slate-800 bg-slate-50 p-4 rounded-xl border border-slate-200/80 min-h-[90px] flex items-center">
+                            <span class="text-slate-400 italic text-base">尚未選擇任何句子</span>
+                        </div>
+                    </div>
+
+                    <!-- Main Audio & Practice Action Bar -->
+                    <div class="flex items-center justify-between gap-3 flex-wrap bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                        <!-- Left Group: TTS Audio, Start Shadowing Record, and User Playback -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <!-- Play Audio Button -->
+                            <button id="playAudioBtn" disabled class="theme-btn-secondary font-medium py-2 px-3.5 rounded-xl transition text-xs md:text-sm flex items-center gap-1.5 border shadow-sm">
+                                <i class="fa-solid fa-volume-high theme-icon"></i> 聽發音
+                            </button>
+
+                            <!-- Primary Record / Shadowing Button -->
+                            <button id="recordBtn" disabled class="relative theme-btn-primary font-semibold py-2 px-4 rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center gap-2 text-xs md:text-sm disabled:bg-slate-300">
+                                <span id="recordPulse" class="hidden absolute inset-0 rounded-xl theme-btn-primary recording-pulse pointer-events-none opacity-50"></span>
+                                <i id="recordIcon" class="fa-solid fa-microphone relative z-10"></i>
+                                <span id="recordText" class="relative z-10">開始跟讀</span>
+                            </button>
+
+                            <!-- User Voice Playback Button -->
+                            <button id="playUserAudioBtn" class="hidden bg-white hover:bg-slate-100 text-slate-700 font-medium py-2 px-3.5 rounded-xl transition text-xs md:text-sm flex items-center gap-1.5 border border-slate-300 shadow-sm">
+                                <i class="fa-solid fa-circle-play text-indigo-600"></i> 回放錄音
+                            </button>
+                        </div>
+
+                        <!-- Right Group: Prev & Next Sentence Navigation Arrows -->
+                        <div class="flex items-center gap-1.5 ml-auto">
+                            <button id="prevBtn" disabled class="p-2 text-slate-600 hover:bg-white rounded-lg transition disabled:opacity-30 border border-slate-200 shadow-sm" title="上一句">
+                                <i class="fa-solid fa-chevron-left text-sm"></i>
+                            </button>
+                            <button id="nextBtn" disabled class="p-2 text-slate-600 hover:bg-white rounded-lg transition disabled:opacity-30 border border-slate-200 shadow-sm" title="下一句">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <span class="text-xs text-slate-400 italic block -mt-2">
+                        <i class="fa-solid fa-circle-info text-[10px]"></i> 發音為合成語音，跟讀真人發音請播放YouTube影片練習
+                    </span>
+
+                    <!-- User Speech Recognition Result -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 min-h-[20px]">
+                            <span></span>
+                            <span id="accuracyBadge" class="hidden text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                        </div>
+                        <div id="resultDisplay" class="text-lg leading-relaxed text-slate-800 bg-slate-50 p-4 rounded-xl border border-slate-200/80 min-h-[100px] flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                            <span class="text-slate-400 italic text-base">按下「開始跟讀」按鈕，並朗讀上方句子</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Helper Hint -->
+                <div class="text-center bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-auto">
+                    <p id="micHint" class="text-xs text-slate-500">念對的單字會顯示🟢綠色，念錯顯示🔴紅色</p>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
+        Shadowing English Practice App &bull; Powered by Web Speech API
+    </footer>
+
+    <script>
+        // Themes Configuration
+        const colorThemes = {
+            morning: {
+                c1: '#1B4EF5', c2: '#3874FF', c3: '#5996FF', c4: '#F4CEFF',
+                headerText: '#ffffff', badgeText: '#1B4EF5'
+            },
+            flamingo: {
+                c1: '#FF9999', c2: '#444F5A', c3: '#3E4149', c4: '#FFC8C8',
+                headerText: '#3E4149', badgeText: '#3E4149'
+            },
+            ytred: {
+                c1: '#830000', c2: '#BC0202', c3: '#FF0000', c4: '#FFD6D6',
+                headerText: '#ffffff', badgeText: '#830000'
+            },
+            vintage: {
+                c1: '#0C2B4E', c2: '#1A3D64', c3: '#1D546C', c4: '#E2E8F0',
+                headerText: '#ffffff', badgeText: '#0C2B4E'
+            },
+            sunset: {
+                c1: '#7149C6', c2: '#FC2947', c3: '#FE6244', c4: '#FFDEB9',
+                headerText: '#ffffff', badgeText: '#7149C6'
+            }
+        };
+
+        function applyTheme(themeKey) {
+            const theme = colorThemes[themeKey] || colorThemes.morning;
+            const root = document.documentElement;
+            root.style.setProperty('--c-c1', theme.c1);
+            root.style.setProperty('--c-c2', theme.c2);
+            root.style.setProperty('--c-c3', theme.c3);
+            root.style.setProperty('--c-c4', theme.c4);
+            root.style.setProperty('--header-text', theme.headerText);
+            root.style.setProperty('--badge-text', theme.badgeText);
+        }
+
+        document.getElementById('themeSelect').addEventListener('change', (e) => {
+            applyTheme(e.target.value);
+        });
+
+        // App State
+        let sentences = [];
+        let currentIndex = -1;
+        let isRecording = false;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        let voices = [];
+
+        // MediaRecorder variables for user voice recording
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordedAudioUrl = null;
+        let userAudioPlayer = new Audio();
+
+        // DOM Elements
+        const transcriptInput = document.getElementById('transcriptInput');
+        const parseBtn = document.getElementById('parseBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const sentenceList = document.getElementById('sentenceList');
+        const sentenceCounter = document.getElementById('sentenceCounter');
+        
+        const targetSentenceDisplay = document.getElementById('targetSentenceDisplay');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const playAudioBtn = document.getElementById('playAudioBtn');
+        const playUserAudioBtn = document.getElementById('playUserAudioBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const recordIcon = document.getElementById('recordIcon');
+        const recordText = document.getElementById('recordText');
+        const recordPulse = document.getElementById('recordPulse');
+        
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const speedSelect = document.getElementById('speedSelect');
+        const currentStatus = document.getElementById('currentStatus');
+        const accuracyBadge = document.getElementById('accuracyBadge');
+        const browserAlert = document.getElementById('browserAlert');
+
+        const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+        const loadYtBtn = document.getElementById('loadYtBtn');
+        const ytPlayerContainer = document.getElementById('ytPlayerContainer');
+        const ytIframe = document.getElementById('ytIframe');
+
+        // Extract YouTube ID
+        function extractYouTubeId(url) {
+            if (!url) return null;
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : url.trim();
+        }
+
+        // Load YouTube embed player safely
+        function loadYouTubeVideo() {
+            const inputVal = youtubeUrlInput.value.trim();
+            if (!inputVal) return;
+            const videoId = extractYouTubeId(inputVal);
+            if (videoId && videoId.length === 11) {
+                ytIframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0`;
+                ytPlayerContainer.classList.remove('hidden');
+            } else {
+                alert('請輸入有效的 YouTube 影片網址或影片 ID');
+            }
+        }
+
+        loadYtBtn.addEventListener('click', loadYouTubeVideo);
+        youtubeUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                loadYouTubeVideo();
+            }
+        });
+
+        // Load SpeechSynthesis Voices
+        function loadVoices() {
+            if (!synth) return;
+            voices = synth.getVoices();
+
+            voiceSelect.innerHTML = '';
+
+            const optionsConfig = [
+                { id: 'us', label: '美式口音 (en-US)', lang: 'en-US' },
+                { id: 'uk', label: '英式口音 (en-GB)', lang: 'en-GB' }
+            ];
+
+            optionsConfig.forEach(cfg => {
+                const availableForLang = voices.filter(v => v.lang.replace('_', '-').toLowerCase().startsWith(cfg.lang.toLowerCase()));
+                
+                const opt = document.createElement('option');
+                if (availableForLang.length > 0) {
+                    opt.value = availableForLang[0].name;
+                    opt.textContent = cfg.label;
+                } else {
+                    opt.value = "";
+                    opt.textContent = `${cfg.label} (無內建語音)`;
+                    opt.disabled = true;
+                }
+                voiceSelect.appendChild(opt);
+            });
+
+            if (voiceSelect.options.length === 0 || voices.length === 0) {
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = "";
+                defaultOpt.textContent = "標準英文語音";
+                voiceSelect.appendChild(defaultOpt);
+            }
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            browserAlert.classList.remove('hidden');
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isRecording = true;
+                updateRecordingUI(true);
+                currentStatus.textContent = "聆聽中...";
+                currentStatus.className = "text-xs font-semibold uppercase tracking-wider text-rose-600 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-100";
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                compareAndRender(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech Recognition Error:", event.error);
+                if (event.error !== 'no-speech') {
+                    stopRecording();
+                    alert("語音辨識發生錯誤：" + event.error);
+                }
+            };
+
+            recognition.onend = () => {
+                if (isRecording) {
+                    stopRecording();
+                }
+            };
+        }
+
+        // Initialize Audio Recording
+        async function startMediaRecording() {
+            try {
+                audioChunks = [];
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (recordedAudioUrl) {
+                        URL.revokeObjectURL(recordedAudioUrl);
+                    }
+                    recordedAudioUrl = URL.createObjectURL(audioBlob);
+                    userAudioPlayer.src = recordedAudioUrl;
+                    playUserAudioBtn.classList.remove('hidden');
+                    
+                    // Stop tracks to release microphone
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+            } catch (err) {
+                console.warn("Unable to record microphone audio:", err);
+            }
+        }
+
+        function stopMediaRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }
+
+        playUserAudioBtn.addEventListener('click', () => {
+            if (userAudioPlayer.src) {
+                userAudioPlayer.play();
+            }
+        });
+
+        function parseTranscript(text) {
+            if (!text.trim()) return [];
+            
+            const rawSentences = text
+                .replace(/\r?\n|\r/g, ' ')
+                .split(/(?<=[.?!])\s+/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            return rawSentences;
+        }
+
+        function renderSentenceList() {
+            sentenceList.innerHTML = '';
+            sentenceCounter.textContent = `${sentences.length} 句`;
+
+            if (sentences.length === 0) {
+                sentenceList.innerHTML = `
+                    <div class="text-center text-slate-400 py-12 flex flex-col items-center gap-2">
+                        <i class="fa-solid fa-arrow-up text-2xl opacity-40"></i>
+                        <p>請在左側貼上文章並按下「逐字稿→句子」</p>
+                    </div>`;
+                return;
+            }
+
+            sentences.forEach((sentence, idx) => {
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-xl border transition cursor-pointer flex items-start gap-2.5 ${
+                    idx === currentIndex 
+                        ? 'theme-active-item font-medium shadow-sm' 
+                        : 'bg-white border-slate-200/70 hover:bg-slate-50 text-slate-700'
+                }`;
+                
+                item.innerHTML = `
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-md ${
+                        idx === currentIndex ? 'theme-active-badge' : 'bg-slate-100 text-slate-500'
+                    }">${idx + 1}</span>
+                    <p class="text-xs leading-relaxed flex-1">${escapeHtml(sentence)}</p>
+                `;
+
+                item.addEventListener('click', () => selectSentence(idx));
+                sentenceList.appendChild(item);
+            });
+        }
+
+        function selectSentence(index) {
+            if (index < 0 || index >= sentences.length) return;
+            
+            if (isRecording) {
+                stopRecording();
+            }
+
+            currentIndex = index;
+            renderSentenceList();
+            
+            const currentSentence = sentences[currentIndex];
+            targetSentenceDisplay.textContent = currentSentence;
+            
+            resultDisplay.innerHTML = `<span class="text-slate-400 italic text-base">按下「開始跟讀」按鈕，並朗讀上方句子</span>`;
+            accuracyBadge.classList.add('hidden');
+            playUserAudioBtn.classList.add('hidden');
+
+            playAudioBtn.disabled = false;
+            recordBtn.disabled = !SpeechRecognition;
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === sentences.length - 1;
+
+            currentStatus.textContent = "開始跟讀練習";
+            currentStatus.className = "text-xs font-semibold uppercase tracking-wider theme-badge px-2.5 py-1 rounded-md border";
+        }
+
+        function speakCurrentSentence() {
+            if (currentIndex < 0 || !sentences[currentIndex]) return;
+            
+            if (synth.speaking) {
+                synth.cancel();
+            }
+
+            const text = sentences[currentIndex];
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = parseFloat(speedSelect.value);
+
+            const selectedVoiceName = voiceSelect.value;
+            if (selectedVoiceName) {
+                const selectedVoiceObj = voices.find(v => v.name === selectedVoiceName);
+                if (selectedVoiceObj) {
+                    utterance.voice = selectedVoiceObj;
+                }
+            }
+
+            utterance.onstart = () => {
+                playAudioBtn.classList.add('theme-btn-primary');
+            };
+
+            utterance.onend = () => {
+                playAudioBtn.classList.remove('theme-btn-primary');
+            };
+
+            synth.speak(utterance);
+        }
+
+        function toggleRecording() {
+            if (!recognition) return;
+
+            if (isRecording) {
+                stopRecording();
+            } else {
+                if (synth.speaking) synth.cancel();
+                playUserAudioBtn.classList.add('hidden');
+                startMediaRecording();
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("Recognition start error:", e);
+                }
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            if (recognition) {
+                recognition.stop();
+            }
+            stopMediaRecording();
+            updateRecordingUI(false);
+            currentStatus.textContent = "錄音結束";
+            currentStatus.className = "text-xs font-semibold uppercase tracking-wider text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200";
+        }
+
+        function updateRecordingUI(recording) {
+            if (recording) {
+                recordBtn.classList.add('bg-rose-600');
+                recordIcon.className = "fa-solid fa-square text-lg relative z-10";
+                recordText.textContent = "停止錄音";
+                recordPulse.classList.remove('hidden');
+            } else {
+                recordBtn.classList.remove('bg-rose-600');
+                recordIcon.className = "fa-solid fa-microphone text-lg relative z-10";
+                recordText.textContent = "開始跟讀";
+                recordPulse.classList.add('hidden');
+            }
+        }
+
+        function cleanSentenceWords(text) {
+            return text.toLowerCase()
+                       .replace(/[^a-z0-9\s']/g, '')
+                       .trim()
+                       .split(/\s+/)
+                       .filter(w => w.length > 0);
+        }
+
+        function compareAndRender(spokenText) {
+            if (currentIndex < 0) return;
+
+            const targetRaw = sentences[currentIndex];
+            const targetTokens = targetRaw.trim().split(/\s+/);
+            const targetClean = targetTokens.map(w => w.toLowerCase().replace(/[^a-z0-9']/g, ''));
+            const spokenClean = cleanSentenceWords(spokenText);
+
+            resultDisplay.innerHTML = '';
+
+            let correctCount = 0;
+            let spokenIdx = 0;
+            let lastMatchedTargetIdx = -1;
+
+            targetTokens.forEach((token, idx) => {
+                const targetWordClean = targetClean[idx];
+                const span = document.createElement('span');
+
+                if (!targetWordClean) {
+                    span.className = 'text-slate-400 font-medium text-base';
+                    span.textContent = token;
+                    resultDisplay.appendChild(span);
+                    return;
+                }
+
+                let matched = false;
+                let matchedSpokenPos = -1;
+
+                for (let lookahead = spokenIdx; lookahead < Math.min(spokenIdx + 3, spokenClean.length); lookahead++) {
+                    if (spokenClean[lookahead] === targetWordClean) {
+                        matched = true;
+                        matchedSpokenPos = lookahead;
+                        break;
+                    }
+                }
+
+                if (matched) {
+                    spokenIdx = matchedSpokenPos + 1;
+                    lastMatchedTargetIdx = idx;
+                    correctCount++;
+                    span.className = 'px-1.5 py-0.5 rounded font-medium transition-all text-base border bg-emerald-100 text-emerald-800 border-emerald-300';
+                    span.textContent = token;
+                } else if (spokenIdx < spokenClean.length && idx <= lastMatchedTargetIdx + 1) {
+                    span.className = 'px-1.5 py-0.5 rounded font-medium transition-all text-base border bg-rose-100 text-rose-700 border-rose-300 line-through decoration-rose-400 decoration-2';
+                    span.textContent = token;
+                } else {
+                    span.className = 'px-1.5 py-0.5 rounded font-medium transition-all text-base border bg-slate-100 text-slate-400 border-slate-200';
+                    span.textContent = token;
+                }
+
+                resultDisplay.appendChild(span);
+            });
+
+            const totalWords = targetClean.filter(w => w.length > 0).length;
+            const accuracy = totalWords > 0 ? Math.round((correctCount / totalWords) * 100) : 0;
+
+            accuracyBadge.classList.remove('hidden');
+            if (accuracy >= 85) {
+                accuracyBadge.textContent = `太棒了！ ${accuracy}%`;
+                accuracyBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white';
+            } else if (accuracy >= 60) {
+                accuracyBadge.textContent = `做得不錯 ${accuracy}%`;
+                accuracyBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white';
+            } else {
+                accuracyBadge.textContent = `加油！ ${accuracy}%`;
+                accuracyBadge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white';
+            }
+
+            if (isRecording && (lastMatchedTargetIdx === targetTokens.length - 1 || spokenIdx >= targetClean.length)) {
+                setTimeout(() => {
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                }, 400);
+            }
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+
+        parseBtn.addEventListener('click', () => {
+            const rawText = transcriptInput.value;
+            sentences = parseTranscript(rawText);
+            if (sentences.length > 0) {
+                selectSentence(0);
+            } else {
+                sentenceList.innerHTML = `<div class="text-center text-slate-400 py-8">未找到有效句子，請貼上英文內容。</div>`;
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            transcriptInput.value = '';
+            sentences = [];
+            currentIndex = -1;
+            renderSentenceList();
+            targetSentenceDisplay.innerHTML = `<span class="text-slate-400 italic text-base">尚未選擇任何句子</span>`;
+            resultDisplay.innerHTML = `<span class="text-slate-400 italic text-base">按下「開始跟讀」按鈕，並朗讀上方句子</span>`;
+            accuracyBadge.classList.add('hidden');
+            playUserAudioBtn.classList.add('hidden');
+            playAudioBtn.disabled = true;
+            recordBtn.disabled = true;
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            currentStatus.textContent = "開始跟讀練習";
+            currentStatus.className = "text-xs font-semibold uppercase tracking-wider theme-badge px-2.5 py-1 rounded-md border";
+        });
+
+        playAudioBtn.addEventListener('click', speakCurrentSentence);
+        recordBtn.addEventListener('click', toggleRecording);
+
+        prevBtn.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                selectSentence(currentIndex - 1);
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentIndex < sentences.length - 1) {
+                selectSentence(currentIndex + 1);
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            applyTheme('ytred');
+            sentences = parseTranscript(transcriptInput.value);
+            if (sentences.length > 0) {
+                selectSentence(0);
+            }
+        });
+    </script>
+</body>
+</html>
